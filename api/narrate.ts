@@ -14,7 +14,8 @@
  * and the client uses the hand-authored card — the game runs fully keyless.
  */
 
-export const config = { runtime: 'nodejs' };
+// Runs on the default Vercel Node.js serverless runtime (no edge config needed).
+declare const process: { env: Record<string, string | undefined> };
 
 const MODEL = 'gemini-2.5-flash';
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
