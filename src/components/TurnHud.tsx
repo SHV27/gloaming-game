@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { BoardProps } from 'boardgame.io/react';
 import type { GState } from '../game/types';
 import { Dice } from './Dice';
@@ -17,6 +18,7 @@ import {
 
 export function TurnHud({ props, myTurn }: { props: BoardProps<GState>; myTurn: boolean }) {
   const { G, ctx, moves } = props;
+  const [accusing, setAccusing] = useState(false);
   const me = G.players[ctx.currentPlayer];
   if (!me) return null;
 
@@ -34,7 +36,8 @@ export function TurnHud({ props, myTurn }: { props: BoardProps<GState>; myTurn: 
 
   // What the board will do the instant this turn ends — the felt threat.
   const incomingStrikes = strikeCount(G, BASE_STRIKES);
-  const nextStrikes = incomingStrikes + 1;
+  // Press-On delve success chance: roll a d6 ≥ (3 + current pressOns).
+  const pressOdds = Math.max(0, Math.round(((4 - G.pressOns) / 6) * 100));
 
   return (
     <div className="border-t border-haze/30 bg-dusk/95 px-4 py-3 backdrop-blur">
@@ -165,6 +168,59 @@ export function TurnHud({ props, myTurn }: { props: BoardProps<GState>; myTurn: 
               </Button>
             ))}
 
+            {/* the Marked's covert sabotage (only the Marked sees this) */}
+            {me.role === 'marked' && (
+              <button
+                type="button"
+                disabled={G.sowedThisTurn || me.light <= 1 || !!G.pendingEvent}
+                onClick={() => moves.sow()}
+                title="Quietly feed the dark: +1 Dread, but it costs you 1 Light. Once per turn. No one will know it was you."
+                className="flex items-center gap-2 rounded-md border border-dread/50 bg-dread/10 px-4 py-2 font-display text-sm uppercase tracking-wide text-dread-bright hover:bg-dread/20 disabled:opacity-30"
+              >
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                  <path d="M8 2 V14 M3 6 H13 M4.5 11 L11.5 11" />
+                </svg>
+                Sow the Dark
+              </button>
+            )}
+
+            {/* the party's one accusation */}
+            {G.hasMarked && !G.castOutUsed &&
+              (accusing ? (
+                <span className="flex items-center gap-1 rounded-md border border-dread/40 bg-dread/5 px-2 py-1">
+                  <span className="font-display text-[11px] uppercase tracking-wide text-dread-bright/80">Cast out:</span>
+                  {Object.values(G.players)
+                    .filter((p) => p.id !== me.id && p.alive)
+                    .map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => {
+                          moves.castOut(p.id);
+                          setAccusing(false);
+                        }}
+                        className="rounded border border-white/10 px-1.5 py-0.5 font-display text-[11px] hover:bg-white/10"
+                        style={{ color: SEAT_COLORS[p.seat] }}
+                      >
+                        {p.name}
+                      </button>
+                    ))}
+                  <button type="button" onClick={() => setAccusing(false)} className="px-1 text-[11px] text-fog-dim hover:text-parchment">
+                    ✕
+                  </button>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  disabled={!!G.pendingEvent}
+                  onClick={() => setAccusing(true)}
+                  title="Accuse one bearer of being Marked. Right: the dark recoils (−4 Dread, their Sow is stilled). Wrong: the party fractures (+4 Dread). One accusation per game."
+                  className="rounded-md border border-haze/50 bg-white/5 px-4 py-2 font-display text-sm uppercase tracking-wide text-parchment hover:bg-white/10 disabled:opacity-30"
+                >
+                  Cast Out…
+                </button>
+              ))}
+
             <div className="flex-1" />
 
             <span
@@ -182,10 +238,10 @@ export function TurnHud({ props, myTurn }: { props: BoardProps<GState>; myTurn: 
             <Button
               variant="danger"
               disabled={G.pressOns >= PRESS_ON_MAX || !!G.pendingEvent}
-              title={`Take another action — but the Gloaming will strike ×${nextStrikes} this turn.`}
+              title={`Delve for an extra action: roll ≥${3 + G.pressOns} to gain a boon (${pressOdds}% chance); fail and the dark takes ${G.pressOns + 1} Light + Dread. Also +1 Gloaming strike this turn.`}
               onClick={() => moves.pressOn()}
             >
-              Press On → ×{nextStrikes} ⚠
+              Press On · {pressOdds}%
             </Button>
             <Button variant="primary" disabled={!!G.pendingEvent} onClick={() => moves.endTurn()}>
               End Turn

@@ -33,8 +33,8 @@ function assert(cond: boolean, label: string) {
 
 // ── headless client ──────────────────────────────────────────────────────────
 type AnyClient = ReturnType<typeof Client>;
-function makeClient(names: string[]): AnyClient {
-  const c = Client({ game: makeGloaming({ names }), numPlayers: names.length });
+function makeClient(names: string[], marked = false): AnyClient {
+  const c = Client({ game: makeGloaming({ names, marked }), numPlayers: names.length });
   c.start();
   return c;
 }
@@ -156,7 +156,7 @@ function chooseGoal(g: GState, nodeId: number, light: number, embers: number): n
   return THRESHOLD_ID;
 }
 
-function resolvePending(c: AnyClient) {
+function resolvePending(c: AnyClient, sabotage = false) {
   let g = G(c);
   let guard = 0;
   while (g.pendingEvent && guard++ < 5) {
@@ -174,6 +174,8 @@ function resolvePending(c: AnyClient) {
         else if (e.kind === 'corruptEdge') sc -= 2;
         else if (e.kind === 'doubleNextDrain') sc -= 2;
       }
+      // the Marked wants the opposite: maximise harm to the party
+      if (sabotage) sc = -sc;
       if (sc > bestScore) {
         bestScore = sc;
         best = i;
@@ -186,10 +188,23 @@ function resolvePending(c: AnyClient) {
 
 function playTurn(c: AnyClient) {
   const pid = ctx(c).currentPlayer;
+  // adopt this seat's view so we can read its own (otherwise-hidden) role
+  (c as unknown as { updatePlayerID?: (id: string) => void }).updatePlayerID?.(pid);
   if (!G(c).players[pid].alive) {
     c.moves.endTurn();
     return;
   }
+
+  // The Marked sabotages: pick the most harmful omen, and feed the dark while
+  // healthy (sow self-costs Light, so reckless sowing would dim them).
+  if (G(c).players[pid].role === 'marked') {
+    resolvePending(c, true);
+    if (ctx(c).gameover) return;
+    if (G(c).players[pid].light > 3 && !G(c).sowedThisTurn) c.moves.sow();
+    if (!ctx(c).gameover) c.moves.endTurn();
+    return;
+  }
+
   resolvePending(c);
   if (ctx(c).gameover) return; // an omen can fill Dread and end the game
   if (G(c).players[pid].dimmed) {
@@ -251,8 +266,8 @@ function playTurn(c: AnyClient) {
   if (!ctx(c).gameover) c.moves.endTurn();
 }
 
-function simulate(numPlayers: number): { over: GameoverState; turns: number } {
-  const c = makeClient(SEAT_NAMES.slice(0, numPlayers).map((n) => n));
+function simulate(numPlayers: number, marked = false): { over: GameoverState; turns: number } {
+  const c = makeClient(SEAT_NAMES.slice(0, numPlayers).map((n) => n), marked);
   let turns = 0;
   while (!ctx(c).gameover && turns < 600) {
     playTurn(c);
@@ -276,10 +291,23 @@ function simTests() {
     if (over?.winner === 'lanternbearers') wins++;
     else losses++;
   }
-  console.log(`  ${N} games · win-rate ${((wins / N) * 100).toFixed(0)}% · avg ${(totalTurns / N).toFixed(0)} turns`);
+  console.log(`  Marked OFF · ${N} games · survivor win-rate ${((wins / N) * 100).toFixed(0)}% · avg ${(totalTurns / N).toFixed(0)} turns`);
   console.log(`  outcomes: ${JSON.stringify(reasons)}`);
   assert(wins > 0, 'the game is winnable through the real engine');
   assert(losses > 0, 'the game is losable through the real engine');
+
+  // Marked ON — 4-player tables with an active saboteur
+  const M = 60;
+  let markedWins = 0;
+  let bearerWins = 0;
+  for (let i = 0; i < M; i++) {
+    const { over } = simulate(4, true);
+    if (over?.winner === 'marked') markedWins++;
+    else if (over?.winner === 'lanternbearers') bearerWins++;
+  }
+  console.log(`  Marked ON  · ${M} 4p games · Marked wins ${((markedWins / M) * 100).toFixed(0)}% · bearers foil ${((bearerWins / M) * 100).toFixed(0)}%`);
+  assert(markedWins > 0, 'the Marked can win');
+  assert(bearerWins > 0, 'the Marked can be foiled');
 }
 
 pureTests();

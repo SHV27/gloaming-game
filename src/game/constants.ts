@@ -32,15 +32,22 @@ export const DREAD_TIDE_RISE = 1; // dread always +1 per turn end
  *  three accelerations so the back third genuinely closes in (CLAUDE §6). */
 export const DREAD_STRIKE_RATIOS = [0.33, 0.6, 0.85] as const;
 
-/** Dread the night needs to fall — scaled to table size, with room for ~10 rounds. */
+/** Dread the night needs to fall — scaled to table size, with room for ~12 rounds. */
 export function dreadMaxFor(numPlayers: number): number {
-  return 11 * numPlayers;
+  return 12 * numPlayers;
 }
 
 /** Number of *extra* Gloaming strikes from the current Dread ratio. */
 export function dreadStrikeBonus(dread: number, dreadMax: number): number {
   return DREAD_STRIKE_RATIOS.reduce((n, r) => (dread >= r * dreadMax ? n + 1 : n), 0);
 }
+
+// — The Marked (hidden role) —
+export const MIN_MARKED_PLAYERS = 4; // the Marked is only offered at 4+ seats
+
+// — The Stalker —
+export const STALKER_SPAWN_RATIO = 0.62; // Dread fraction at which it wakes (late-game menace)
+export const STALKER_DRAIN = 2; // Light torn away when it catches an item-less bearer
 
 export const SEAT_COLORS = [
   'var(--color-seat-1)',

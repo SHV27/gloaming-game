@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence, useAnimationControls } from 'framer-motion';
 import type { BoardProps } from 'boardgame.io/react';
 import type { GState, BoardNode } from '../game/types';
@@ -10,6 +10,7 @@ import { EventLog } from './EventLog';
 import { NarratorPanel } from './NarratorPanel';
 import { HandoffScreen } from './HandoffScreen';
 import { GameOver } from './GameOver';
+import { RoleReveal } from './RoleReveal';
 import { TopBar } from './TopBar';
 import { useGameSound } from '../hooks/useGameSound';
 import { useShell } from './shell';
@@ -72,6 +73,10 @@ export function GloamingBoard(props: BoardProps<GState>) {
 
   const myTurn = playerID === ctx.currentPlayer && !ctx.gameover;
   const me = playerID ? G.players[playerID] : undefined;
+
+  // The Marked's private one-time reveal (after handoff; never the prev player).
+  const [ackedMarked, setAckedMarked] = useState<Record<string, boolean>>({});
+  const showRoleReveal = myTurn && me?.role === 'marked' && !!playerID && !ackedMarked[playerID];
 
   // players grouped by node (so co-located tokens fan out)
   const byNode = useMemo(() => {
@@ -240,6 +245,11 @@ export function GloamingBoard(props: BoardProps<GState>) {
                 );
               })}
 
+              {/* the Stalker */}
+              {G.stalker && (
+                <StalkerToken x={G.nodes[G.stalker.nodeId].x} y={G.nodes[G.stalker.nodeId].y} />
+              )}
+
               <rect
                 x={0}
                 y={0}
@@ -267,6 +277,15 @@ export function GloamingBoard(props: BoardProps<GState>) {
           <NarratorPanel
             cardId={G.pendingEvent.cardId}
             onChoose={(i) => moves.resolveOmen(i)}
+            ai={shell.aiNarrator}
+            context={{
+              playerName: G.players[ctx.currentPlayer]?.name ?? 'the bearer',
+              dread: G.dread,
+              dreadMax: G.dreadMax,
+              beaconsLit: G.beaconsLit,
+              stalker: !!G.stalker,
+              recentLog: G.log.slice(-4).map((l) => l.text),
+            }}
           />
         )}
       </AnimatePresence>
@@ -282,11 +301,56 @@ export function GloamingBoard(props: BoardProps<GState>) {
         )}
       </AnimatePresence>
 
+      {/* The Marked's private reveal */}
+      <AnimatePresence>
+        {showRoleReveal && me && (
+          <RoleReveal
+            name={me.name}
+            onDismiss={() => setAckedMarked((s) => ({ ...s, [playerID!]: true }))}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Game over */}
       <AnimatePresence>
         {ctx.gameover && <GameOver gameover={ctx.gameover} G={G} onRestart={shell.restart} />}
       </AnimatePresence>
     </div>
+  );
+}
+
+// ── the Stalker ──────────────────────────────────────────────────────────────
+function StalkerToken({ x, y }: { x: number; y: number }) {
+  return (
+    <motion.g
+      initial={false}
+      animate={{ x, y }}
+      transition={{ type: 'tween', duration: 0.7, ease: 'easeInOut' }}
+    >
+      <motion.circle
+        fill="var(--color-dread)"
+        filter="url(#soft)"
+        animate={{ r: [18, 24, 18], opacity: [0.2, 0.42, 0.2] }}
+        transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      {/* ragged dark body */}
+      <path
+        d="M0,-15 L6,-4 L14,-2 L7,5 L9,15 L0,9 L-9,15 L-7,5 L-14,-2 L-6,-4 Z"
+        fill="var(--color-void)"
+        stroke="var(--color-dread)"
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+      />
+      {/* the eye */}
+      <motion.circle
+        r={3.4}
+        cy={-2}
+        fill="var(--color-dread-bright)"
+        animate={{ opacity: [1, 0.4, 1] }}
+        transition={{ duration: 1.4, repeat: Infinity }}
+        style={{ filter: 'drop-shadow(0 0 5px var(--color-dread-bright))' }}
+      />
+    </motion.g>
   );
 }
 

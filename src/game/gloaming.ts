@@ -2,7 +2,7 @@ import type { Game } from 'boardgame.io';
 import { INVALID_MOVE } from 'boardgame.io/core';
 import type { GState, Player, ItemId, LogTone, EventType } from './types';
 import { BOARD, HEARTH_ID, THRESHOLD_ID, BEACON_NODE_IDS } from './board';
-import { OMEN_DECK, eventById } from './events';
+import { OMEN_DECK, eventById, ITEMS } from './events';
 import {
   AP_BASE,
   PRESS_ON_MAX,
@@ -17,6 +17,7 @@ import {
   BASE_STRIKES,
   DREAD_TIDE_RISE,
   SEAT_NAMES,
+  MIN_MARKED_PLAYERS,
   dreadMaxFor,
 } from './constants';
 import {
@@ -29,9 +30,12 @@ import {
   cleanseEdgeNear,
   addBeaconEmber,
   gloamingStrike,
+  stalkerPhase,
   strikeCount,
   recomputeBeaconsLit,
   checkGameover,
+  addDread,
+  drainLight,
 } from './effects';
 
 /** Minimal shapes for the boardgame.io plugin APIs we use (kept local & honest). */
@@ -44,6 +48,8 @@ interface RandomAPI {
 
 const toneFor = (t: EventType): LogTone =>
   t === 'gift' ? 'hope' : t === 'trap' || t === 'stalker' ? 'dread' : 'neutral';
+
+const ITEM_IDS: ItemId[] = ['ward', 'oil', 'mapfrag'];
 
 function drawOmen(G: GState, random: RandomAPI): number | null {
   if (G.deck.length === 0) {
@@ -58,6 +64,7 @@ const actionBudget = (G: GState) => AP_BASE + G.pressOns;
 
 export interface GloamingConfig {
   names: string[]; // 2–6 names; length = numPlayers
+  marked?: boolean; // seat one hidden Marked (4+ players)
 }
 
 export function makeGloaming(config: GloamingConfig): Game<GState> {
@@ -70,6 +77,13 @@ export function makeGloaming(config: GloamingConfig): Game<GState> {
       const nodes = BOARD.slice()
         .map((n) => ({ ...n, neighbors: [...n.neighbors] }))
         .sort((a, b) => a.id - b.id); // index === id
+
+      // Secretly mark one bearer. setup runs only on the master, and playerView
+      // strips the result from every client, so this never leaks.
+      let markedId: string | null = null;
+      if (config.marked && names.length >= MIN_MARKED_PLAYERS) {
+        markedId = String(random.Die(names.length) - 1);
+      }
 
       const players: Record<string, Player> = {};
       names.forEach((nm, seat) => {
@@ -86,7 +100,7 @@ export function makeGloaming(config: GloamingConfig): Game<GState> {
           graced: false,
           warded: false,
           doubleDrain: false,
-          role: 'bearer',
+          role: String(seat) === markedId ? 'marked' : 'bearer',
         };
       });
 
@@ -122,9 +136,26 @@ export function makeGloaming(config: GloamingConfig): Game<GState> {
         logSeq: 1,
         flash: null,
         flashSeq: 1,
-        secret: {},
+        stalker: null,
+        sowedThisTurn: false,
+        hasMarked: markedId !== null,
+        castOutUsed: false,
+        markedExposed: false,
+        secret: { markedId },
       };
     },
+
+    // Secret State: each client receives only its OWN role; `secret` is wiped.
+    playerView: ({ G, playerID }) => ({
+      ...G,
+      players: Object.fromEntries(
+        Object.entries(G.players).map(([id, p]) => [
+          id,
+          id === playerID ? p : { ...p, role: undefined },
+        ]),
+      ),
+      secret: { markedId: null },
+    }),
 
     turn: {
       // The Gloaming plays back at the end of every turn (idempotent).
@@ -137,6 +168,7 @@ export function makeGloaming(config: GloamingConfig): Game<GState> {
         G.lastRoll = null;
         G.pendingEvent = null;
         G.flash = null;
+        G.sowedThisTurn = false;
 
         const p = G.players[ctx.currentPlayer];
         if (!p || !p.alive) {
@@ -168,6 +200,7 @@ export function makeGloaming(config: GloamingConfig): Game<GState> {
         addDreadTide(G);
         const strikes = strikeCount(G, BASE_STRIKES);
         for (let i = 0; i < strikes; i++) gloamingStrike(G, random as RandomAPI);
+        stalkerPhase(G, random as RandomAPI);
         recomputeBeaconsLit(G);
         flash(G, 'dread-strike');
       },
@@ -357,14 +390,75 @@ export function makeGloaming(config: GloamingConfig): Game<GState> {
         undoable: false,
       },
 
-      // — push your luck: another action this turn, at the cost of a Gloaming strike —
-      pressOn: ({ G, ctx }) => {
+      // — push your luck: an extra action + a delve into the dark (rising risk) —
+      pressOn: ({ G, ctx, random }) => {
         const p = G.players[ctx.currentPlayer];
         if (!p.alive || p.dimmed) return INVALID_MOVE;
         if (G.pendingEvent) return INVALID_MOVE;
         if (G.pressOns >= PRESS_ON_MAX) return INVALID_MOVE;
-        G.pressOns++;
-        log(G, `${p.name} presses deeper into the dark — the Gloaming will answer.`, 'dread');
+        G.pressOns++; // grants the extra action AND adds a Gloaming strike at turn end
+
+        // the delve — succeed on a high roll; the threshold climbs each press
+        const need = 2 + G.pressOns; // 1st press: ≥3, 2nd: ≥4
+        const r = random.D6();
+        G.lastRoll = r;
+        flash(G, 'dice');
+        if (r >= need) {
+          const kind = random.Die(3);
+          if (kind === 1) {
+            gainEmbers(p, 2);
+            log(G, `${p.name} presses into the dark and returns with embers (rolled ${r}).`, 'hope');
+          } else if (kind === 2) {
+            gainLight(p, 2);
+            log(G, `${p.name} presses on and finds a pocket of warmth (rolled ${r}).`, 'hope');
+          } else {
+            const it = ITEM_IDS[random.Die(ITEM_IDS.length) - 1];
+            p.items.push(it);
+            log(G, `${p.name} presses on and finds a ${ITEMS[it].name} in the gloom (rolled ${r}).`, 'hope');
+          }
+        } else {
+          // penalty scales with how hard you've pushed
+          addDread(G, G.pressOns);
+          drainLight(G, p, G.pressOns);
+          log(G, `${p.name} presses too far — the dark bites back, hard (rolled ${r}).`, 'dread');
+          flash(G, 'dread-strike');
+        }
+      },
+
+      // — the party's one accusation: turn on a suspected traitor —
+      castOut: {
+        move: ({ G, ctx }, targetId: string) => {
+          const p = G.players[ctx.currentPlayer];
+          const t = G.players[targetId];
+          if (!G.hasMarked || G.castOutUsed) return INVALID_MOVE;
+          if (!p.alive || p.dimmed || !!G.pendingEvent) return INVALID_MOVE;
+          if (!t || t.id === p.id) return INVALID_MOVE;
+          G.castOutUsed = true;
+          if (t.role === 'marked') {
+            G.markedExposed = true;
+            addDread(G, -4);
+            log(G, `The circle turns on ${t.name} — and the dark recoils. ${t.name} was Marked. Their hand is stayed.`, 'fellow');
+          } else {
+            addDread(G, 4);
+            log(G, `${p.name} accuses ${t.name} — but the dark only laughs. ${t.name} was no traitor, and the night gains.`, 'dread');
+          }
+        },
+        undoable: false,
+      },
+
+      // — the Marked's covert sabotage: feed the dark with your own warmth —
+      sow: ({ G, ctx }) => {
+        const p = G.players[ctx.currentPlayer];
+        if (!p.alive || p.dimmed) return INVALID_MOVE;
+        if (p.role !== 'marked') return INVALID_MOVE;
+        if (G.markedExposed) return INVALID_MOVE; // exposed — the dark no longer answers you
+        if (G.sowedThisTurn || G.pendingEvent) return INVALID_MOVE;
+        if (p.light <= 1) return INVALID_MOVE; // can't sow yourself to the dark
+        G.sowedThisTurn = true;
+        addDread(G, 1);
+        drainLight(G, p, 1); // self-cost — sow too greedily and you dim (a tell)
+        // ambient log — never names the culprit
+        log(G, 'A chill that belongs to no season deepens. The dark gains, somehow.', 'dread');
       },
 
       // — end the turn (the board then plays back) —

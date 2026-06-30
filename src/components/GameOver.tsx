@@ -21,6 +21,16 @@ const COPY: Record<
     line: 'One by one the lanterns went out. The board keeps its silence, and its new and quiet guests.',
     tone: 'lose',
   },
+  'marked-foiled': {
+    title: 'The Threshold Opens',
+    line: 'The true bearers cross into the dawn — and the one who walked among them, willing the dark to win, is left behind on the wrong side of the light.',
+    tone: 'win',
+  },
+  'marked-triumph': {
+    title: 'The Night Was Always Theirs',
+    line: 'The dark wins — as one of you always meant it to. The traitor smiles in the dying light.',
+    tone: 'lose',
+  },
 };
 
 export function GameOver({
@@ -70,6 +80,22 @@ export function GameOver({
         <p className="mx-auto mt-5 max-w-md font-body text-base italic leading-relaxed text-parchment/85">
           {copy.line}
         </p>
+
+        {gameover.markedId != null && G.players[gameover.markedId] && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.9 }}
+            className="mx-auto mt-6 max-w-sm rounded-lg border border-dread/40 bg-dread/10 px-5 py-3"
+          >
+            <div className="font-display text-[10px] uppercase tracking-[0.35em] text-dread-bright/80">
+              The Marked
+            </div>
+            <div className="mt-1 font-display text-xl text-dread-bright text-glow-dread">
+              {G.players[gameover.markedId].name} walked among you.
+            </div>
+          </motion.div>
+        )}
 
         <div className="mt-6 flex items-center justify-center gap-6 font-display text-sm text-fog">
           <span>{G.beaconsLit}/3 beacons lit</span>

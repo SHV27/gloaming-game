@@ -233,7 +233,35 @@ Run via `tsx`. Exit non-zero on failure. This is the slice's living proof it's w
 
 ## 11 · Tuning first-pass (`constants.ts`, refined in playtest/Council)
 
-`AP_BASE = 1` · `PRESS_ON_MAX = 2` · `STRIDE_DIE = 6` · `EMBERS_PER_BEACON = 3` · `LIGHT_START = 5` ·
-`LIGHT_MAX = 7` · `EMBER_START = 1` · `GATHER_AMOUNT = 2` · `STEADY_LIGHT = 2` ·
-`DREAD_MAX = 18 + 2*(numPlayers)` · `BASE_STRIKES = 1` · dread-strike thresholds at `dread ≥ 6` (+1) and `≥ 12` (+1).
-Numbers exist to be tuned against the running build until it's tense-but-winnable.
+Tuned via the sim to: `EMBERS_PER_BEACON=4`, `GATHER_AMOUNT=3`, `STEADY_LIGHT=2`, `LIGHT_START=6/MAX=8`,
+`BASE_STRIKES=1`, strike ratios `[.33,.6,.85]`, `dreadMaxFor=11*n`, ramped drain prob/amount. ~30% greedy-bot win.
+
+---
+
+# PLAN — Session 2 (Depth · Hidden Role · Living Narrator)
+
+## F1 · The Marked (hidden role)
+- Setup toggle (4+ players). `setup` secretly sets `role:'marked'` on one seat + `G.secret.markedId` (master-only RNG).
+- **`playerView`** strips every other player's `role` and nulls `secret.markedId` → no client ever learns who's Marked (only your own role survives). Hotseat `playerID` swap re-filters per seat.
+- Private reveal on the Marked's **HandoffScreen** ("You are Marked"); a private agenda panel (only if `me.role==='marked'`).
+- Covert lever: **`sow()`** (Marked-only, once/turn) → +1 Dread, logged as ambient ("a chill no one can place") so it's unattributable.
+- `endIf`: bearers `crossed` ⇒ Marked foiled (reveal). Night falls with a Marked present ⇒ `marked-triumph`. Reveal recontextualises ("it was you all along").
+
+## F2 · Stalker + deeper push-your-luck
+- **Stalker:** `G.stalker` wakes when `dread ≥ STALKER_SPAWN_RATIO*max`, spawns far from the party, and each board phase BFS-steps toward the nearest alive bearer. Catch (shares a node) ⇒ steals an item, else drains `STALKER_DRAIN` Light. Visible menacing token; dread-tick quickens as it nears.
+- **Press On → a real gamble:** pressing grants the extra action AND rolls a delve — success (≥ rising threshold) → reward (ember/light/item); failure → the dark bites (Dread + drain). Risk rises each press.
+
+## F3 · The Living Narrator (Gemini 2.5 Flash, server-only)
+- `api/narrate.ts` (Vercel, `runtime:nodejs`): `gemini-2.5-flash` via `generateContent`, key `process.env.GEMINI_API_KEY` (**server-only**, header `x-goog-api-key`), `responseMimeType:'application/json'` + `responseSchema` (UPPERCASE types), `AbortController` 8s timeout. **Always returns 200 + `{source}`** — never throws.
+- **Safe contract:** the AI *re-skins* a drawn deck card — returns `{title, narration, choices:[{label,outcome}]}` matching the card's choice count; **effects stay the deck card's** (the AI can't invent mechanics). Client validates shape → else uses original card text.
+- **Continuity:** `systemInstruction` (narrator voice + JSON contract + world bible) + a rolling client-side **story summary** of recent beats; address players by name.
+- **Fallback (mandatory):** no key / 429 / error / bad JSON / AI off ⇒ original hand-authored card. Client cache (by card+context) + exponential backoff. Game fully playable keyless/offline.
+- Setup toggle **"Living Narrator (AI)"**.
+
+## F4 · Balance via the auto-research loop
+- Extend `scripts/playtest.ts`: add a Marked-bot strategy; report survivor win-rate (Marked OFF, target ~45–60%), avg length, and Marked-win frequency (Marked ON). Iterate constants.
+
+## Edge cases (Council will check)
+- Hidden info NEVER reaches other clients (assert `playerView` strips role+secret); reveal only at handoff/endgame.
+- Narrator JSON parsing bulletproof; key unset ⇒ silent fallback; AI off ⇒ deck. No key in client bundle.
+- Stalker can't soft-lock; catch is fair. Marked is fun for both sides (covert but counterable by efficient play + the reveal).

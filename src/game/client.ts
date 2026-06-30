@@ -8,9 +8,9 @@ import { GloamingBoard } from '../components/Board';
  * one device; App swaps the `playerID` prop behind a handoff interstitial so
  * the previous bearer's screen is never on display (hidden-info safe → S2).
  */
-export function makeGloamingClient(names: string[]) {
+export function makeGloamingClient(names: string[], opts: { marked?: boolean } = {}) {
   return Client({
-    game: makeGloaming({ names }),
+    game: makeGloaming({ names, marked: opts.marked }),
     board: GloamingBoard,
     numPlayers: names.length,
     multiplayer: Local(),

@@ -5,6 +5,12 @@ import { sound } from '../audio/sound';
 
 const MIN = 2;
 const MAX = 4; // S1 slice; S2 raises to 6
+const MIN_MARKED = 4; // the Marked is offered at 4+ seats
+
+export interface StartOpts {
+  marked: boolean;
+  ai: boolean;
+}
 
 // Seeded organic ember scatter (no diagonal lattice).
 const EMBERS = (() => {
@@ -25,15 +31,19 @@ const EMBERS = (() => {
   }));
 })();
 
-export function SetupScreen({ onStart }: { onStart: (names: string[]) => void }) {
+export function SetupScreen({ onStart }: { onStart: (names: string[], opts: StartOpts) => void }) {
   const [count, setCount] = useState(3);
   const [names, setNames] = useState<string[]>(SEAT_NAMES.slice(0, MAX).map((n) => n));
+  const [marked, setMarked] = useState(false);
+  const [ai, setAi] = useState(false);
+
+  const markedAvailable = count >= MIN_MARKED;
 
   const start = () => {
     sound.init();
     sound.play('beacon');
     const roster = Array.from({ length: count }, (_, i) => names[i]?.trim() || SEAT_NAMES[i]);
-    onStart(roster);
+    onStart(roster, { marked: marked && markedAvailable, ai });
   };
 
   return (
@@ -133,6 +143,25 @@ export function SetupScreen({ onStart }: { onStart: (names: string[]) => void })
             ))}
           </div>
 
+          {/* modes */}
+          <div className="mb-6 space-y-2">
+            <Toggle
+              on={marked && markedAvailable}
+              disabled={!markedAvailable}
+              onClick={() => setMarked((v) => !v)}
+              label="The Marked walks among you"
+              hint={markedAvailable ? 'One bearer secretly serves the dark.' : 'Needs 4+ bearers.'}
+              tone="dread"
+            />
+            <Toggle
+              on={ai}
+              onClick={() => setAi((v) => !v)}
+              label="Living Narrator (AI)"
+              hint="The Gloaming tells its own story. Falls back to the deck with no key."
+              tone="ember"
+            />
+          </div>
+
           <motion.button
             type="button"
             whileHover={{ y: -2 }}
@@ -149,5 +178,48 @@ export function SetupScreen({ onStart }: { onStart: (names: string[]) => void })
         </p>
       </motion.div>
     </div>
+  );
+}
+
+function Toggle({
+  on,
+  onClick,
+  label,
+  hint,
+  tone,
+  disabled,
+}: {
+  on: boolean;
+  onClick: () => void;
+  label: string;
+  hint: string;
+  tone: 'dread' | 'ember';
+  disabled?: boolean;
+}) {
+  const accent = tone === 'dread' ? 'var(--color-dread)' : 'var(--color-ember)';
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => {
+        sound.play('ui');
+        onClick();
+      }}
+      className="flex w-full items-center gap-3 rounded-md border border-white/10 bg-night/50 px-3 py-2.5 text-left transition-colors hover:bg-white/5 disabled:opacity-40"
+    >
+      <span
+        className="relative h-5 w-9 shrink-0 rounded-full transition-colors"
+        style={{ background: on ? accent : 'var(--color-haze)' }}
+      >
+        <span
+          className="absolute top-0.5 h-4 w-4 rounded-full bg-night transition-all"
+          style={{ left: on ? '1.25rem' : '0.125rem' }}
+        />
+      </span>
+      <span className="min-w-0">
+        <span className="block font-display text-xs uppercase tracking-wide text-parchment">{label}</span>
+        <span className="block font-body text-[11px] text-fog-dim">{hint}</span>
+      </span>
+    </button>
   );
 }

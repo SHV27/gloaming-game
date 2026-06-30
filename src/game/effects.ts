@@ -1,9 +1,12 @@
 import type { GState, Player, Effect, LogTone, GameoverState, FlashKind } from './types';
 import { EDGES, edgeKey, BEACON_NODE_IDS } from './board';
+import { ITEMS } from './events';
 import {
   LIGHT_MAX,
   EMBER_CAP,
   EMBERS_PER_BEACON,
+  STALKER_SPAWN_RATIO,
+  STALKER_DRAIN,
   dreadStrikeBonus,
 } from './constants';
 
@@ -215,16 +218,110 @@ export function strikeCount(G: GState, baseStrikes: number): number {
   return baseStrikes + dreadStrikeBonus(G.dread, G.dreadMax) + G.pressOns;
 }
 
+// ── The Stalker ───────────────────────────────────────────────────────────
+/** First node to step to from `from` along the shortest path to any goal. */
+function bfsNextStep(G: GState, from: number, goals: Set<number>): number | null {
+  if (goals.has(from)) return null;
+  const prev = new Map<number, number>();
+  const seen = new Set([from]);
+  const q = [from];
+  while (q.length) {
+    const cur = q.shift()!;
+    for (const n of G.nodes[cur].neighbors) {
+      if (seen.has(n)) continue;
+      seen.add(n);
+      prev.set(n, cur);
+      if (goals.has(n)) {
+        let x = n;
+        while (prev.get(x) !== from) x = prev.get(x)!;
+        return x;
+      }
+      q.push(n);
+    }
+  }
+  return null;
+}
+
+function farthestNodeFromParty(G: GState, alive: Player[]): number {
+  const cx = alive.reduce((s, p) => s + G.nodes[p.nodeId].x, 0) / alive.length;
+  const cy = alive.reduce((s, p) => s + G.nodes[p.nodeId].y, 0) / alive.length;
+  let best = 0;
+  let bestD = -1;
+  for (const n of G.nodes) {
+    const d = (n.x - cx) ** 2 + (n.y - cy) ** 2;
+    if (d > bestD) {
+      bestD = d;
+      best = n.id;
+    }
+  }
+  return best;
+}
+
+/** Wake / move / resolve the Stalker. Runs in the board phase, after strikes. */
+export function stalkerPhase(G: GState, roll: Roll): void {
+  const alive = Object.values(G.players).filter((p) => p.alive);
+  if (alive.length === 0) return;
+  const ratio = G.dread / G.dreadMax;
+
+  if (!G.stalker) {
+    if (ratio < STALKER_SPAWN_RATIO) return;
+    G.stalker = { active: true, nodeId: farthestNodeFromParty(G, alive) };
+    log(G, 'Something vast unfolds from the dark and begins, unhurried, to walk. The Stalker has woken.', 'dread');
+    flash(G, 'dread-strike');
+    return; // arrives now, hunts from next phase
+  }
+
+  // step one node toward the nearest alive bearer
+  const goals = new Set(alive.map((p) => p.nodeId));
+  const next = bfsNextStep(G, G.stalker.nodeId, goals);
+  if (next !== null) G.stalker.nodeId = next;
+
+  // catch anyone it now shares a node with — it ALWAYS bites
+  for (const p of alive.filter((q) => q.nodeId === G.stalker!.nodeId)) {
+    if (p.items.length > 0) {
+      const idx = Math.floor(roll.Number() * p.items.length) % p.items.length;
+      const lost = p.items.splice(idx, 1)[0];
+      drainLight(G, p, 1);
+      log(G, `The Stalker closes on ${p.name}, tears away their ${ITEMS[lost].name}, and a cold follows.`, 'dread');
+    } else {
+      drainLight(G, p, STALKER_DRAIN);
+      log(G, `The Stalker reaches ${p.name} — a cold beyond cold floods through them.`, 'dread');
+    }
+    flash(G, 'dimmed');
+  }
+}
+
 // ── win / lose (pure; gloaming.ts endIf wraps this) ───────────────────────────
 export function checkGameover(G: GState): GameoverState | undefined {
+  const marked = G.secret?.markedId ?? null;
   const alive = Object.values(G.players).filter((p) => p.alive);
-  // Win is checked FIRST: a party that crosses on the same turn-end the tide
-  // peaks has escaped — they don't lose to it (engineer fix).
-  if (alive.length > 0 && G.beaconsLit >= 3 && alive.every((p) => p.nodeId === G.thresholdId)) {
-    return { winner: 'lanternbearers', reason: 'crossed' };
+  const aliveBearers = alive.filter((p) => p.role !== 'marked');
+
+  // Win is checked FIRST: a party that crosses as the tide peaks has escaped.
+  // Only the TRUE bearers must reach the Threshold (the Marked can't stall it).
+  if (
+    aliveBearers.length > 0 &&
+    G.beaconsLit >= 3 &&
+    aliveBearers.every((p) => p.nodeId === G.thresholdId)
+  ) {
+    return marked
+      ? { winner: 'lanternbearers', reason: 'marked-foiled', markedId: marked }
+      : { winner: 'lanternbearers', reason: 'crossed' };
   }
-  if (alive.length === 0) return { winner: 'gloaming', reason: 'all-lost' };
-  if (G.dread >= G.dreadMax) return { winner: 'gloaming', reason: 'nightfell' };
+  if (alive.length === 0) {
+    return marked
+      ? { winner: 'marked', reason: 'marked-triumph', markedId: marked }
+      : { winner: 'gloaming', reason: 'all-lost' };
+  }
+  // Only the Marked still stands — the bearers are lost; don't dead-walk to nightfall.
+  if (marked && aliveBearers.length === 0) {
+    return { winner: 'marked', reason: 'marked-triumph', markedId: marked };
+  }
+  if (G.dread >= G.dreadMax) {
+    return marked
+      ? { winner: 'marked', reason: 'marked-triumph', markedId: marked }
+      : { winner: 'gloaming', reason: 'nightfell' };
+  }
   return undefined;
 }
 

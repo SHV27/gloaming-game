@@ -1,7 +1,9 @@
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { eventById } from '../game/events';
-import type { EventType } from '../game/types';
+import type { EventType, Effect } from '../game/types';
 import { sound } from '../audio/sound';
+import { narrate, type NarrationContext, type Reskin } from '../game/narrator';
 
 const TYPE_LABEL: Record<EventType, string> = {
   gift: 'A Gift',
@@ -18,6 +20,50 @@ const TYPE_COLOR: Record<EventType, string> = {
   bargain: 'var(--color-seat-2)',
   stalker: 'var(--color-dread-bright)',
 };
+
+type Chip = { text: string; tone: 'good' | 'bad' | 'neutral' };
+const sign = (n: number) => (n >= 0 ? `+${n}` : `${n}`);
+
+/** Mechanical cost of a choice, shown as chips so AI flavour never hides the trade. */
+function costChips(effects: Effect[]): Chip[] {
+  const out: Chip[] = [];
+  for (const e of effects) {
+    const a = e.amount ?? 0;
+    switch (e.kind) {
+      case 'light':
+        out.push({ text: `${sign(a)} ☼`, tone: a >= 0 ? 'good' : 'bad' });
+        break;
+      case 'embers':
+        out.push({ text: `${sign(a)} ✦`, tone: a >= 0 ? 'good' : 'bad' });
+        break;
+      case 'dread':
+        out.push({ text: `${sign(a)} dread`, tone: a > 0 ? 'bad' : 'good' });
+        break;
+      case 'beaconEmber':
+        out.push({ text: '+ beacon', tone: 'good' });
+        break;
+      case 'grantItem':
+        out.push({ text: '+ item', tone: 'good' });
+        break;
+      case 'ward':
+        out.push({ text: 'ward', tone: 'good' });
+        break;
+      case 'cleanseEdge':
+        out.push({ text: 'path mends', tone: 'good' });
+        break;
+      case 'corruptEdge':
+        out.push({ text: 'path rots', tone: 'bad' });
+        break;
+      case 'doubleNextDrain':
+        out.push({ text: 'hunted', tone: 'bad' });
+        break;
+      case 'pullToDark':
+        out.push({ text: 'dragged', tone: 'bad' });
+        break;
+    }
+  }
+  return out;
+}
 
 const container = {
   hidden: { opacity: 0 },
@@ -39,12 +85,43 @@ const line = {
 export function NarratorPanel({
   cardId,
   onChoose,
+  ai,
+  context,
 }: {
   cardId: number;
   onChoose: (index: number) => void;
+  ai: boolean;
+  context: NarrationContext;
 }) {
   const card = eventById(cardId);
-  const lines = card.narrator.split(/(?<=[.!?])\s+/).filter(Boolean);
+  const [reskin, setReskin] = useState<Reskin | null>(null);
+  const [fetching, setFetching] = useState(ai);
+
+  // Render the hand-authored card immediately; if the Living Narrator answers,
+  // crossfade to its words. Never block the game on the network.
+  useEffect(() => {
+    let cancelled = false;
+    if (!ai) return;
+    setFetching(true);
+    narrate(card, context)
+      .then((r) => {
+        if (!cancelled) setReskin(r);
+      })
+      .finally(() => !cancelled && setFetching(false));
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cardId]);
+
+  const title = reskin?.title ?? card.title;
+  const narration = reskin?.narration ?? card.narrator;
+  const choices = card.choices.map((c, i) => ({
+    label: reskin?.choices[i]?.label ?? c.label,
+    outcome: reskin?.choices[i]?.outcome ?? c.outcome,
+    effects: c.effects,
+  }));
+  const lines = narration.split(/(?<=[.!?])\s+/).filter(Boolean);
   const accent = TYPE_COLOR[card.type];
 
   return (
@@ -85,8 +162,17 @@ export function NarratorPanel({
               {TYPE_LABEL[card.type]}
             </motion.div>
 
-            <motion.h2 variants={line} className="mb-4 font-display text-2xl text-parchment text-engraved">
-              {card.title}
+            <motion.h2 variants={line} className="mb-4 flex items-center gap-2 font-display text-2xl text-parchment text-engraved">
+              {title}
+              {ai && (
+                <span
+                  className="font-body text-[10px] uppercase tracking-widest"
+                  style={{ color: accent, opacity: fetching ? 1 : reskin ? 0.7 : 0.3 }}
+                  title={reskin ? 'Narrated by the Living Gloaming' : fetching ? 'The Gloaming finds its words…' : 'The Gloaming kept its silence'}
+                >
+                  {fetching ? '✦ stirring…' : reskin ? '✦ living' : ''}
+                </span>
+              )}
             </motion.h2>
 
             <div className="mb-6 space-y-2">
@@ -107,7 +193,7 @@ export function NarratorPanel({
                 visible: { transition: { delayChildren: 0.5 + lines.length * 0.12, staggerChildren: 0.08 } },
               }}
             >
-              {card.choices.map((c, i) => (
+              {choices.map((c, i) => (
                 <motion.button
                   key={i}
                   type="button"
@@ -126,8 +212,22 @@ export function NarratorPanel({
                     className="inline-block h-2 w-2 shrink-0 rotate-45 rounded-[1px]"
                     style={{ background: accent, boxShadow: `0 0 6px ${accent}` }}
                   />
-                  <span className="font-body text-[15px] text-parchment/90 group-hover:text-parchment">
+                  <span className="flex-1 font-body text-[15px] text-parchment/90 group-hover:text-parchment">
                     {c.label}
+                  </span>
+                  <span className="flex shrink-0 flex-wrap justify-end gap-1">
+                    {costChips(c.effects).map((chip, k) => (
+                      <span
+                        key={k}
+                        className="rounded px-1.5 py-0.5 font-display text-[10px] uppercase tracking-wide"
+                        style={{
+                          color: chip.tone === 'good' ? 'var(--color-ember-bright)' : chip.tone === 'bad' ? 'var(--color-dread-bright)' : 'var(--color-fog)',
+                          background: chip.tone === 'good' ? 'rgba(240,168,48,0.12)' : chip.tone === 'bad' ? 'rgba(196,58,99,0.14)' : 'rgba(255,255,255,0.05)',
+                        }}
+                      >
+                        {chip.text}
+                      </span>
+                    ))}
                   </span>
                 </motion.button>
               ))}

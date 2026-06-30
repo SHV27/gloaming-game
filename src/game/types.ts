@@ -114,10 +114,11 @@ export interface Flash {
   nodeId?: number;
 }
 
-export type Winner = 'lanternbearers' | 'gloaming';
+export type Winner = 'lanternbearers' | 'gloaming' | 'marked';
 export interface GameoverState {
   winner: Winner;
-  reason: 'crossed' | 'nightfell' | 'all-lost';
+  reason: 'crossed' | 'nightfell' | 'all-lost' | 'marked-triumph' | 'marked-foiled';
+  markedId?: string | null; // revealed at game end
 }
 
 // ── The whole game state ──────────────────────────────────────────────────
@@ -149,6 +150,18 @@ export interface GState {
   flash: Flash | null;
   flashSeq: number;
 
-  // S2 — shaped now, empty this session
-  secret: Record<string, never>;
+  // The Stalker — a hunting entity the Gloaming spawns at higher Dread
+  stalker: { active: boolean; nodeId: number } | null;
+
+  // per-turn marker for the Marked's covert action
+  sowedThisTurn: boolean;
+
+  // The Marked / accusation (all public — not secret)
+  hasMarked: boolean; // a Marked exists this game (the table knows the mode)
+  castOutUsed: boolean; // the once-per-game accusation has been spent
+  markedExposed: boolean; // a correct Cast Out has silenced the Marked's Sow
+
+  // Secret State — hidden from every client via playerView (only your own
+  // `role` survives the strip). `markedId` is nulled out for everyone.
+  secret: { markedId: string | null };
 }

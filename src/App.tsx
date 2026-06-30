@@ -1,22 +1,24 @@
 import { useMemo, useState } from 'react';
-import { SetupScreen } from './components/SetupScreen';
+import { SetupScreen, type StartOpts } from './components/SetupScreen';
 import { makeGloamingClient } from './game/client';
 import { ShellContext, type ShellApi } from './components/shell';
 
 export default function App() {
   const [names, setNames] = useState<string[] | null>(null);
+  const [opts, setOpts] = useState<StartOpts>({ marked: false, ai: false });
   const [seat, setSeat] = useState('0');
   const [runId, setRunId] = useState(0);
 
-  // One hotseat client per run; rebuilt (fresh shuffle) when a new roster starts.
+  // One hotseat client per run; rebuilt (fresh shuffle / role draw) on a new roster.
   const GloamingClient = useMemo(
-    () => (names ? makeGloamingClient(names) : null),
-    [names, runId],
+    () => (names ? makeGloamingClient(names, { marked: opts.marked }) : null),
+    [names, opts.marked, runId],
   );
 
   const shell: ShellApi = useMemo(
     () => ({
       names: names ?? [],
+      aiNarrator: opts.ai,
       gotoSeat: (s) => setSeat(s),
       restart: () => {
         setNames(null);
@@ -24,14 +26,15 @@ export default function App() {
         setRunId((r) => r + 1);
       },
     }),
-    [names],
+    [names, opts.ai],
   );
 
   if (!names || !GloamingClient) {
     return (
       <SetupScreen
-        onStart={(roster) => {
+        onStart={(roster, o) => {
           setSeat('0');
+          setOpts(o);
           setNames(roster);
         }}
       />
