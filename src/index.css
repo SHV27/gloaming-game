@@ -1,0 +1,158 @@
+@import 'tailwindcss';
+
+/* ============================================================================
+   GLOAMING — Design Tokens (single source of truth)
+   Dusk-fantasy storybook: deep indigo/charcoal base, ember-gold accents, fog.
+   Everything downstream references these — no rogue inline hex in components.
+   ============================================================================ */
+@theme {
+  /* — Night substrate (darkest → lifting) — */
+  --color-void: #06050c;
+  --color-night: #0b0a16;
+  --color-dusk: #12101f;
+  --color-twilight: #1a1730;
+  --color-mist: #272343;
+  --color-haze: #36325a;
+
+  /* — Ember gold (warmth, hope, the beacons) — */
+  --color-ember: #f0a830;
+  --color-ember-bright: #ffd87a;
+  --color-ember-deep: #b9761b;
+  --color-ember-glow: #ffe6a8;
+
+  /* — Dread (the tide, the antagonist) — */
+  --color-dread: #c43a63;
+  --color-dread-deep: #7a1f3d;
+  --color-dread-bright: #ff6b96;
+
+  /* — Parchment / ink (narrator surfaces & text) — */
+  --color-parchment: #ece3cf;
+  --color-parchment-dim: #b8ad94;
+  --color-ink: #14101a;
+  --color-fog: #9a93b8;
+  --color-fog-dim: #6b6589;
+
+  /* — Board surfaces (so the map carries no rogue hex) — */
+  --color-edge: #2a2745;
+  --color-edge-rim: #1a1730;
+  --color-node-rim: #4a4470;
+  --color-node-hollow-core: #221d3a;
+  --color-node-hollow-rim: #110f1e;
+  --color-node-hearth-core: #4a3415;
+  --color-glow-well: #5fb6c9; /* glacier — matches seat-2 */
+  --color-glow-shrine: #c77dff; /* orchid — matches seat-3 (no near-miss) */
+  --color-token-dead: #3a3550;
+
+  /* — Bone-die material ramp — */
+  --color-bone-hi: #f3ead2;
+  --color-bone-mid: #e3d4b0;
+  --color-bone-lo: #cdb98c;
+  --color-bone-pip: #2a1c08;
+
+  /* — Player seat colors (up to 6, cohesive within the dusk palette) — */
+  --color-seat-1: #f0a830; /* ember   */
+  --color-seat-2: #5fb6c9; /* glacier */
+  --color-seat-3: #c77dff; /* orchid  */
+  --color-seat-4: #7bc88a; /* moss    */
+  --color-seat-5: #ff8c69; /* coral   */
+  --color-seat-6: #d6c453; /* brass   */
+
+  /* — Type — */
+  --font-display: 'Cinzel', 'Spectral', Georgia, serif;
+  --font-body: 'Spectral', Georgia, 'Times New Roman', serif;
+  --font-mono: 'SF Mono', 'Cascadia Code', ui-monospace, monospace;
+
+  /* — Motion (durations & easings, used everywhere) — */
+  --ease-settle: cubic-bezier(0.22, 1, 0.36, 1); /* gentle overshoot-free settle */
+  --ease-thunk: cubic-bezier(0.34, 1.56, 0.64, 1); /* slight overshoot, dice/cards land */
+  --ease-tide: cubic-bezier(0.65, 0, 0.35, 1); /* slow inevitable swell */
+}
+
+/* ── Global reset / atmosphere ─────────────────────────────────────────── */
+:root {
+  color-scheme: dark;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-body);
+  color: var(--color-parchment);
+  background: var(--color-void);
+  overflow: hidden; /* the board owns the viewport */
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Display headings default to Cinzel with the wide, carved letterspacing it wants */
+h1,
+h2,
+h3,
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.04em;
+}
+
+/* Thin custom scrollbars so the log/narrator don't break the mood */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-haze) transparent;
+}
+*::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-haze);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Honor reduced-motion: keep meaning, drop the flourish */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Reusable atmosphere utilities ─────────────────────────────────────── */
+@utility text-glow-ember {
+  text-shadow:
+    0 0 12px rgba(255, 216, 122, 0.45),
+    0 0 2px rgba(255, 216, 122, 0.6);
+}
+
+@utility text-glow-dread {
+  text-shadow:
+    0 0 14px rgba(255, 107, 150, 0.5),
+    0 0 3px rgba(196, 58, 99, 0.7);
+}
+
+/* Faint engraved letterpress for big display type on dark surfaces */
+@utility text-engraved {
+  text-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.6),
+    0 -1px 0 rgba(255, 255, 255, 0.04);
+}
