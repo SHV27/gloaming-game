@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { motion, AnimatePresence, useAnimationControls } from 'framer-motion';
+import { motion, AnimatePresence, useAnimationControls, useReducedMotion } from 'framer-motion';
 import type { BoardProps } from 'boardgame.io/react';
 import type { GState, BoardNode } from '../game/types';
 import { BOARD_W, BOARD_H, EDGES, edgeKey } from '../game/board';
@@ -11,8 +11,10 @@ import { NarratorPanel } from './NarratorPanel';
 import { HandoffScreen } from './HandoffScreen';
 import { GameOver } from './GameOver';
 import { RoleReveal } from './RoleReveal';
+import { Atmosphere } from './Atmosphere';
 import { TopBar } from './TopBar';
 import { useGameSound } from '../hooks/useGameSound';
+import { sound } from '../audio/sound';
 import { useShell } from './shell';
 
 const NODE_GRAD: Record<BoardNode['type'], string> = {
@@ -73,6 +75,25 @@ export function GloamingBoard(props: BoardProps<GState>) {
 
   const myTurn = playerID === ctx.currentPlayer && !ctx.gameover;
   const me = playerID ? G.players[playerID] : undefined;
+  const reduce = !!useReducedMotion();
+  const dreadRatio = Math.min(1, G.dread / G.dreadMax);
+
+  // win/lose sting (once)
+  const stungRef = useRef(false);
+  useEffect(() => {
+    if (ctx.gameover && !stungRef.current) {
+      stungRef.current = true;
+      sound.play(ctx.gameover.winner === 'lanternbearers' ? 'win' : 'lose');
+    }
+  }, [ctx.gameover]);
+
+  // the Dread heartbeat — quickens as night nears (only once it's felt)
+  useEffect(() => {
+    if (reduce || ctx.gameover || dreadRatio < 0.42) return;
+    const interval = Math.max(680, 1850 - dreadRatio * 1250);
+    const id = setInterval(() => sound.play('heartbeat'), interval);
+    return () => clearInterval(id);
+  }, [dreadRatio, reduce, ctx.gameover]);
 
   // The Marked's private one-time reveal (after handoff; never the prev player).
   const [ackedMarked, setAckedMarked] = useState<Record<string, boolean>>({});
@@ -170,7 +191,26 @@ export function GloamingBoard(props: BoardProps<GState>) {
                 </filter>
               </defs>
 
-              <rect x={0} y={0} width={BOARD_W} height={BOARD_H} fill="var(--color-node-hollow-rim)" />
+              {/* the world the board sits in */}
+              <Atmosphere ratio={dreadRatio} reduce={reduce} />
+
+              {/* lantern-light each alive bearer casts on the dark */}
+              {Object.values(G.players)
+                .filter((p) => p.alive)
+                .map((p) => {
+                  const node = G.nodes[p.nodeId];
+                  return (
+                    <circle
+                      key={`ll-${p.id}`}
+                      cx={node.x}
+                      cy={node.y}
+                      r={p.dimmed ? 18 : 42}
+                      fill={SEAT_COLORS[p.seat]}
+                      opacity={p.dimmed ? 0.05 : 0.1}
+                      style={{ filter: 'url(#soft)', transition: 'r 600ms ease, opacity 600ms ease' }}
+                    />
+                  );
+                })}
 
               {/* edges — hand-walked curves, not plotted lines */}
               {EDGES.map(([a, b]) => {
@@ -227,8 +267,8 @@ export function GloamingBoard(props: BoardProps<GState>) {
                 const node = G.nodes[p.nodeId];
                 const group = byNode.get(p.nodeId) ?? [p.id];
                 const idx = group.indexOf(p.id);
-                const fan = group.length > 1 ? 16 : 0;
-                const angle = (idx / Math.max(1, group.length)) * Math.PI * 2;
+                const fan = group.length > 1 ? 17 + group.length * 4 : 0;
+                const angle = (idx / Math.max(1, group.length)) * Math.PI * 2 - Math.PI / 2;
                 const ox = fan ? Math.cos(angle) * fan : 0;
                 const oy = fan ? Math.sin(angle) * fan : 0;
                 return (
@@ -238,6 +278,7 @@ export function GloamingBoard(props: BoardProps<GState>) {
                     y={node.y + oy}
                     color={SEAT_COLORS[p.seat]}
                     name={p.name}
+                    showName={group.length <= 2 || p.id === ctx.currentPlayer}
                     dimmed={p.dimmed}
                     alive={p.alive}
                     isCurrent={p.id === ctx.currentPlayer}
@@ -260,6 +301,32 @@ export function GloamingBoard(props: BoardProps<GState>) {
               />
             </svg>
           </motion.div>
+
+          {/* Dread veil — the night closing in, with a heartbeat that quickens */}
+          <div className="pointer-events-none absolute inset-0 overflow-hidden">
+            <div
+              className="absolute inset-0"
+              style={{
+                background: 'radial-gradient(125% 95% at 50% 38%, transparent 32%, var(--color-void) 100%)',
+                opacity: 0.16 + dreadRatio * 0.55,
+                transition: 'opacity 900ms ease',
+              }}
+            />
+            <motion.div
+              className="absolute inset-0"
+              style={{ boxShadow: 'inset 0 0 170px 36px var(--color-dread-deep)' }}
+              animate={
+                reduce
+                  ? { opacity: dreadRatio * 0.4 }
+                  : { opacity: [dreadRatio * 0.16, dreadRatio * 0.52, dreadRatio * 0.16] }
+              }
+              transition={
+                reduce
+                  ? undefined
+                  : { duration: Math.max(0.62, 2.3 - dreadRatio * 1.5), repeat: Infinity, ease: 'easeInOut' }
+              }
+            />
+          </div>
         </div>
 
         {/* Log + roster */}
@@ -527,16 +594,39 @@ function Sigil({ node, sealed }: { node: BoardNode; sealed: boolean }) {
 
 function BeaconFlame({ x, y }: { x: number; y: number }) {
   return (
-    <motion.circle
-      cx={x}
-      cy={y}
-      r={9}
-      fill="var(--color-ember-bright)"
-      initial={{ scale: 0 }}
-      animate={{ scale: [0, 1.5, 1], opacity: [0, 1, 0.95] }}
-      transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-      style={{ transformOrigin: `${x}px ${y}px`, filter: 'drop-shadow(0 0 12px var(--color-ember))' }}
-    />
+    <g style={{ pointerEvents: 'none' }}>
+      {/* the light it throws on the dark */}
+      <motion.circle
+        cx={x}
+        cy={y}
+        r={44}
+        fill="var(--color-ember)"
+        style={{ filter: 'url(#soft)' }}
+        animate={{ opacity: [0.12, 0.24, 0.12] }}
+        transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      {/* bloom-in core */}
+      <motion.circle
+        cx={x}
+        cy={y}
+        r={9}
+        fill="var(--color-ember-bright)"
+        initial={{ scale: 0 }}
+        animate={{ scale: [0, 1.6, 1] }}
+        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+        style={{ transformOrigin: `${x}px ${y}px`, filter: 'drop-shadow(0 0 12px var(--color-ember))' }}
+      />
+      {/* the living flame */}
+      <motion.circle
+        cx={x}
+        cy={y - 2}
+        r={5}
+        fill="var(--color-ember-glow)"
+        animate={{ scale: [1, 1.22, 0.9, 1.12, 1], opacity: [0.9, 1, 0.82, 1, 0.9] }}
+        transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+        style={{ transformOrigin: `${x}px ${y - 2}px` }}
+      />
+    </g>
   );
 }
 
@@ -545,6 +635,7 @@ function PlayerTokenView({
   y,
   color,
   name,
+  showName,
   dimmed,
   alive,
   isCurrent,
@@ -553,6 +644,7 @@ function PlayerTokenView({
   y: number;
   color: string;
   name: string;
+  showName: boolean;
   dimmed: boolean;
   alive: boolean;
   isCurrent: boolean;
@@ -573,17 +665,31 @@ function PlayerTokenView({
           transition={{ duration: 1.8, repeat: Infinity }}
         />
       )}
-      <circle r={10} fill={alive ? color : 'var(--color-token-dead)'} stroke="var(--color-void)" strokeWidth={2} opacity={dimmed ? 0.4 : 1} />
-      <circle r={4} fill="var(--color-void)" opacity={dimmed ? 0.8 : 0.25} />
+      <circle
+        r={10}
+        fill={alive ? color : 'var(--color-token-dead)'}
+        stroke="var(--color-void)"
+        strokeWidth={2}
+        opacity={dimmed ? 0.4 : 1}
+        style={{ filter: alive && !dimmed ? 'drop-shadow(0 2px 2px rgba(0,0,0,0.55))' : undefined }}
+      />
+      {/* glossy bead highlight */}
+      {alive && !dimmed && <circle cx={-3} cy={-3.5} r={3} fill="var(--color-parchment)" opacity={0.4} />}
+      {/* the lantern they carry */}
+      {alive && !dimmed && (
+        <circle cx={8} cy={6} r={2.6} fill="var(--color-ember-bright)" style={{ filter: 'drop-shadow(0 0 5px var(--color-ember))' }} />
+      )}
       {!alive && (
         <g stroke="var(--color-fog)" strokeWidth={1.6} strokeLinecap="round">
           <line x1={-4} y1={-4} x2={4} y2={4} />
           <line x1={4} y1={-4} x2={-4} y2={4} />
         </g>
       )}
-      <text textAnchor="middle" y={-15} fontSize={11} className="font-display" fill={alive ? color : 'var(--color-fog-dim)'}>
-        {name}
-      </text>
+      {showName && (
+        <text textAnchor="middle" y={-15} fontSize={11} className="font-display" fill={alive ? color : 'var(--color-fog-dim)'}>
+          {name}
+        </text>
+      )}
     </motion.g>
   );
 }

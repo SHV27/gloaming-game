@@ -1,11 +1,15 @@
 import { useState } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { sound } from '../audio/sound';
 import { useShell } from './shell';
+import { Tutorial } from './Tutorial';
 
 /** Slim header: title, sound toggle, abandon-run. */
 export function TopBar() {
   const shell = useShell();
   const [muted, setMuted] = useState(sound.muted);
+  const [vol, setVol] = useState(sound.volume);
+  const [showHelp, setShowHelp] = useState(false);
 
   return (
     <header className="flex items-center justify-between px-4 py-2">
@@ -28,6 +32,32 @@ export function TopBar() {
           <SpeakerIcon muted={muted} />
           {muted ? 'muted' : 'sound'}
         </button>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.05}
+          value={vol}
+          aria-label="Volume"
+          onChange={(e) => {
+            const v = parseFloat(e.target.value);
+            setVol(v);
+            sound.setVolume(v);
+          }}
+          className="hidden h-1 w-20 cursor-pointer accent-ember sm:block"
+        />
+        <button
+          type="button"
+          onClick={() => {
+            sound.play('ui');
+            setShowHelp(true);
+          }}
+          className="flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/5 font-display text-xs text-fog hover:text-parchment"
+          title="How to play"
+          aria-label="How to play"
+        >
+          ?
+        </button>
         <button
           type="button"
           onClick={() => {
@@ -39,6 +69,7 @@ export function TopBar() {
           abandon
         </button>
       </div>
+      <AnimatePresence>{showHelp && <Tutorial onClose={() => setShowHelp(false)} />}</AnimatePresence>
     </header>
   );
 }

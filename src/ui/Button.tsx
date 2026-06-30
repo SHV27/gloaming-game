@@ -5,7 +5,7 @@ import { sound } from '../audio/sound';
 type Variant = 'primary' | 'ghost' | 'danger' | 'beacon';
 
 const base =
-  'relative inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 font-display text-sm tracking-wide uppercase select-none transition-colors disabled:opacity-35 disabled:cursor-not-allowed';
+  'relative inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 font-display text-sm tracking-wide uppercase select-none transition-colors disabled:opacity-35 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ember/60 focus-visible:ring-offset-2 focus-visible:ring-offset-night';
 
 const variants: Record<Variant, string> = {
   primary:

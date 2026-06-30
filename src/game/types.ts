@@ -107,7 +107,8 @@ export type FlashKind =
   | 'dice'
   | 'dimmed'
   | 'item'
-  | 'kindle';
+  | 'kindle'
+  | 'stalker';
 export interface Flash {
   kind: FlashKind;
   nonce: number;

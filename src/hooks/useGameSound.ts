@@ -21,6 +21,9 @@ export function useGameSound(flash: Flash | null): void {
       case 'dimmed':
         sound.play('dimmed');
         break;
+      case 'stalker':
+        sound.play('stalker');
+        break;
       case 'kindle':
       case 'item':
         sound.play('ui');

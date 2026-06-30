@@ -267,7 +267,7 @@ export function stalkerPhase(G: GState, roll: Roll): void {
     if (ratio < STALKER_SPAWN_RATIO) return;
     G.stalker = { active: true, nodeId: farthestNodeFromParty(G, alive) };
     log(G, 'Something vast unfolds from the dark and begins, unhurried, to walk. The Stalker has woken.', 'dread');
-    flash(G, 'dread-strike');
+    flash(G, 'stalker');
     return; // arrives now, hunts from next phase
   }
 

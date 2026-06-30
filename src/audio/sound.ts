@@ -118,18 +118,76 @@ function synAmbient(): string {
   return encodeWav(s);
 }
 
-export type Sfx = 'ui' | 'dice' | 'beacon' | 'dread' | 'dimmed';
+// stalker — a low, approaching menace (detuned growl that swells)
+function synStalker(): string {
+  const s = dur(1.1);
+  for (let i = 0; i < s.length; i++) {
+    const t = i / SR;
+    const env = Math.min(1, t * 2) * Math.exp(-t * 1.1);
+    const growl = sine(t, 48) + 0.6 * sine(t, 49.5) + 0.3 * sine(t, 73);
+    const noise = (Math.random() * 2 - 1) * 0.15;
+    s[i] = (growl + noise) * env * 0.4;
+  }
+  return encodeWav(s);
+}
+
+// win — a warm, rising major chord that blooms
+function synWin(): string {
+  const s = dur(2.2);
+  const notes = [261.6, 329.6, 392, 523.3];
+  for (let i = 0; i < s.length; i++) {
+    const t = i / SR;
+    const env = Math.min(1, t * 3) * Math.exp(-t * 0.9);
+    let v = 0;
+    for (let n = 0; n < notes.length; n++) {
+      if (t > n * 0.18) v += sine(t, notes[n] * (1 + t * 0.02));
+    }
+    s[i] = v * env * 0.16;
+  }
+  return encodeWav(s);
+}
+
+// lose — a deep, descending doom
+function synLose(): string {
+  const s = dur(2.4);
+  for (let i = 0; i < s.length; i++) {
+    const t = i / SR;
+    const f = 110 - t * 36;
+    const env = Math.min(1, t * 2) * Math.exp(-t * 0.8);
+    s[i] = (sine(t, f) + 0.5 * sine(t, f * 0.5) + 0.2 * sine(t, f * 1.5)) * env * 0.3;
+  }
+  return encodeWav(s);
+}
+
+// heartbeat — a soft low lub-dub
+function synHeartbeat(): string {
+  const s = dur(0.5);
+  for (let i = 0; i < s.length; i++) {
+    const t = i / SR;
+    const lub = Math.exp(-t * 22) * sine(t, 60);
+    const dub = t > 0.16 ? Math.exp(-(t - 0.16) * 24) * sine(t - 0.16, 52) * 0.8 : 0;
+    s[i] = (lub + dub) * 0.5;
+  }
+  return encodeWav(s);
+}
+
+export type Sfx = 'ui' | 'dice' | 'beacon' | 'dread' | 'dimmed' | 'stalker' | 'win' | 'lose' | 'heartbeat';
 
 const MUTE_KEY = 'gloaming.muted';
+
+const VOL_KEY = 'gloaming.volume';
 
 class SoundManager {
   private sounds: Partial<Record<Sfx, Howl>> = {};
   private ambient: Howl | null = null;
   private ready = false;
   muted: boolean;
+  volume: number;
 
   constructor() {
     this.muted = localStorage.getItem(MUTE_KEY) === '1';
+    const v = parseFloat(localStorage.getItem(VOL_KEY) ?? '0.8');
+    this.volume = Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0.8;
   }
 
   /** Build Howls once, on first user gesture. */
@@ -142,9 +200,14 @@ class SoundManager {
       beacon: new Howl({ src: [synBeacon()], volume: 0.8 }),
       dread: new Howl({ src: [synDread()], volume: 0.85 }),
       dimmed: new Howl({ src: [synDimmed()], volume: 0.7 }),
+      stalker: new Howl({ src: [synStalker()], volume: 0.7 }),
+      win: new Howl({ src: [synWin()], volume: 0.7 }),
+      lose: new Howl({ src: [synLose()], volume: 0.7 }),
+      heartbeat: new Howl({ src: [synHeartbeat()], volume: 0.5 }),
     };
     this.ambient = new Howl({ src: [synAmbient()], loop: true, volume: 0.0 });
     Howler.mute(this.muted);
+    Howler.volume(this.volume);
     this.ambient.play();
     this.ambient.fade(0, 0.6, 2500);
   }
@@ -159,6 +222,12 @@ class SoundManager {
     localStorage.setItem(MUTE_KEY, this.muted ? '1' : '0');
     Howler.mute(this.muted);
     return this.muted;
+  }
+
+  setVolume(v: number): void {
+    this.volume = Math.min(1, Math.max(0, v));
+    localStorage.setItem(VOL_KEY, String(this.volume));
+    Howler.volume(this.volume);
   }
 }
 

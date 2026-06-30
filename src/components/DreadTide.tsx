@@ -71,5 +71,7 @@ export function DreadTide({ dread, dreadMax }: { dread: number; dreadMax: number
 /** Filter applied to the board so the world literally desaturates as Dread climbs. */
 export function dreadFilter(dread: number, dreadMax: number): string {
   const r = Math.min(1, dread / dreadMax);
-  return `saturate(${(1 - r * 0.72).toFixed(3)}) brightness(${(1 - r * 0.32).toFixed(3)})`;
+  // strong desaturation (colour drains from the world); the Dread veil handles
+  // the darkening, so keep brightness loss gentle here to avoid doubling up.
+  return `saturate(${(1 - r * 0.78).toFixed(3)}) brightness(${(1 - r * 0.16).toFixed(3)})`;
 }

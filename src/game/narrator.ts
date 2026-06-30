@@ -36,6 +36,12 @@ const cache = new Map<string, Reskin>();
 let consecutiveFails = 0;
 let disabled = false;
 
+/** Re-enable the narrator for a fresh run (clears a prior session's give-up state). */
+export function resetNarrator(): void {
+  consecutiveFails = 0;
+  disabled = false;
+}
+
 function buildPrompt(card: EventCard, ctx: NarrationContext): string {
   const dreadPct = Math.round((ctx.dread / ctx.dreadMax) * 100);
   const story = ctx.recentLog.length ? ctx.recentLog.map((l) => `- ${l}`).join('\n') : '- (the journey has just begun)';

@@ -18,6 +18,9 @@ dist-ssr
 !.env.example
 .vercel
 
+# Dev tooling output
+.shots
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { SEAT_NAMES, SEAT_COLORS } from '../game/constants';
 import { sound } from '../audio/sound';
+import { Tutorial, tutorialSeen, markTutorialSeen } from './Tutorial';
 
 const MIN = 2;
 const MAX = 4; // S1 slice; S2 raises to 6
@@ -36,8 +37,14 @@ export function SetupScreen({ onStart }: { onStart: (names: string[], opts: Star
   const [names, setNames] = useState<string[]>(SEAT_NAMES.slice(0, MAX).map((n) => n));
   const [marked, setMarked] = useState(false);
   const [ai, setAi] = useState(false);
+  const [showTut, setShowTut] = useState(!tutorialSeen());
 
   const markedAvailable = count >= MIN_MARKED;
+
+  const closeTut = () => {
+    markTutorialSeen();
+    setShowTut(false);
+  };
 
   const start = () => {
     sound.init();
@@ -173,10 +180,23 @@ export function SetupScreen({ onStart }: { onStart: (names: string[], opts: Star
           </motion.button>
         </div>
 
-        <p className="mt-4 text-center font-body text-[11px] text-fog-dim">
-          Pass-and-play · one device · hand it on at each turn
-        </p>
+        <div className="mt-4 flex items-center justify-center gap-3 text-center font-body text-[11px] text-fog-dim">
+          <span>Pass-and-play · one device</span>
+          <span className="text-haze">·</span>
+          <button
+            type="button"
+            onClick={() => {
+              sound.play('ui');
+              setShowTut(true);
+            }}
+            className="font-display uppercase tracking-widest text-ember/80 hover:text-ember-bright"
+          >
+            How to play
+          </button>
+        </div>
       </motion.div>
+
+      <AnimatePresence>{showTut && <Tutorial onClose={closeTut} />}</AnimatePresence>
     </div>
   );
 }

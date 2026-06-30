@@ -43,6 +43,17 @@
   --color-glow-shrine: #c77dff; /* orchid — matches seat-3 (no near-miss) */
   --color-token-dead: #3a3550;
 
+  /* — Atmosphere (sky, terrain, fog, the world beyond) — */
+  --color-sky-top: #1a1640;
+  --color-sky-mid: #120f2c;
+  --color-sky-bottom: #07060f;
+  --color-dawn: #8a93d6; /* the cold hope-glow over the Threshold */
+  --color-ridge-far: #2a2358;
+  --color-ridge-mid: #1d1840;
+  --color-ridge-near: #15102e;
+  --color-mist-veil: #4a4582;
+  --color-star: #dbe2ff;
+
   /* — Bone-die material ramp — */
   --color-bone-hi: #f3ead2;
   --color-bone-mid: #e3d4b0;
