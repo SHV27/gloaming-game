@@ -6,10 +6,22 @@
 ---
 
 ## Where we are
-**Workstreams WS1–WS3 DONE. Next: WS4 (clarity + tutorial).**
-Sessions S1–S3 shipped a beautiful but too-short/flat 2-player build with a softlock (Ember/light
-ran out and no action button appeared). Session 4 = grand overhaul of design + feel per the brief.
-The v2 engine + the telegraphing Gloaming automa are built, compile, build, and play softlock-free.
+**v2 (The Deepening) is BUILT, TESTED, and SHIPPED to production.** Live: https://gloaming-murex.vercel.app
+Done: WS1 (foundation), WS2 (engine v2), WS3 (Gloaming automa), WS4 (tutorial/clarity), WS5a (Referee suite),
+WS7 (README case study + deploy + 0 console errors). Remaining polish: **WS5b** (finish balance — the 4p gap
++ dead-turn) and **WS6** (deeper feel — dedicated sound cues, grimoire narration + AI re-skin wiring, a11y).
+Sessions S1–S3 shipped a beautiful but too-short/flat 2-player build with a softlock (resources ran out and
+no action button appeared) — v2 is the grand overhaul that fixes it structurally (Wisp/Steady) + rebuilds
+the loop around a single Ember resource, Brave-or-Steady, and a telegraphing living board.
+
+## Shipped-state verification (DoD)
+- `npm run typecheck` ✓ · `npm run build` ✓ · dev server **0 console errors** (live + local, `scripts/console-check.mjs`).
+- `npm run referee` ✓ — softlock invariant + PLAN §H; 120 chaos games (2–6p) all terminate.
+- `npm run playtest` — 0 softlocks; win-rate 2p 47% / 3p 47% / 4p 30%; dead-turn 10–22%.
+- Visual: tutorial, setup, and the live board render clean (legal-move glow, place reacts, two Brave/Steady
+  buttons with previews, goal line, Night tide + Acts, party roster). Screenshots in `.shots/` (gitignored).
+- Deployed to Vercel prod (`shv-s-projects/gloaming`, alias `gloaming-murex.vercel.app`); pushed to GitHub
+  (`SHV27/gloaming-game`, master). No secrets in bundle (narrator key is server-only in `api/narrate.ts`).
 
 ## The v2 design in one breath
 Single resource **Ember** (life+fuel+currency); **0 → Wisp** (auto-drifts, Rekindle-able → softlock cure).
@@ -33,7 +45,9 @@ Win = all non-Wisp on Threshold with 3 lit; Lose = Night fills. Full spec in `PL
 - **WS7 Ship** — Council+Referee+Playtester gate → DoD → Vercel deploy → README case study.
 
 ## NEXT ACTION
-Start **WS4**: rewrite `src/components/Tutorial.tsx` as a v2 teach-by-playing tour (Ember → Roll/Move → the place reacts → Brave vs Steady → the Gloaming telegraphs → Wisp/Rekindle), update `SetupScreen` intro copy (it still says "Dread tide"), and add greyed-with-reason polish on the board's illegal nodes. Then WS5 Referee tests.
+Two follow-ups remain (game is live and fully playable without them):
+1. **WS5b — finish balance** (`constants.ts` tunables; loop via `npm run playtest`): bring **4p from 30% → ~45–55%** and cut **dead-turn (~10–22% → ~0)**. The 4p difficulty is wisp-starvation from more Gloaming turns/round; likely levers: gentler `emberDrainFor`, a touch more `nightMaxFor` slope at high n, or a smarter sim bot (the bot is greedy, not optimal, so real win-rates run a little higher than the sim). Consider whether the sim "dead-turn" metric should exclude rescuable-Wisp turns (they're dramatic, not contentless).
+2. **WS6 — feel polish**: add dedicated procedural SFX in `audio/sound.ts` (kindle, snuff, surge, wisp, rekindle, cross — currently mapped to reused cues in `useGameSound`); re-introduce the **grimoire narration reveal** for the omen text + wire the AI `narrate()` re-skin (verify current free Gemini model name first); make beacon ignite/snuff more visceral on the board; a11y sweep (keyboard nav, contrast, reduced-motion already honored).
 
 ## Open decisions / to-verify
 - **Gemini model name + free limits** — re-verify (web) before the WS7 ship gate; narrator only re-skins, game runs keyless (not blocking earlier WS). AI re-skin is currently unwired in the UI (WS6 reintroduces the grimoire panel + `narrate()`).
