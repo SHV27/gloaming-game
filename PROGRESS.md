@@ -1,71 +1,83 @@
-# PROGRESS.md — GLOAMING v2 (*The Deepening*)
+# PROGRESS.md — GLOAMING v3 (*Trapped Inside*)
 
-> Resumable checkpoint. A fresh session can read this + `PLAN.md` and continue with
-> "continue from PROGRESS.md." Update after **every** workstream. One next action, always.
+> Resumable checkpoint. A fresh session reads this + `PLAN.md` and continues with
+> "read PROGRESS.md and continue the reconception." Update after **every** workstream.
+> One next action, always. Nothing is ever lost.
 
 ---
 
-## Where we are
-**v2 (The Deepening) is BUILT, TESTED, POLISHED, and SHIPPED to production.** Live: https://gloaming-murex.vercel.app
-Done: WS1 (foundation), WS2 (engine v2), WS3 (Gloaming automa), WS4 (tutorial/clarity), WS5a (Referee suite),
-WS6 (feel — 6 dedicated SFX, grimoire narrator + AI re-skin wiring, on-board telegraphs, a11y), WS7 (README
-case study + deploy + 0 console errors). **Only remaining item: WS5b** (4p balance — currently 30%, which the
-owner has accepted as fine). The AI narrator is wired but DORMANT in prod until a `GEMINI_API_KEY` is added to
-the Vercel project env (game runs fully keyless on the hand-authored deck; `gemini-2.5-flash` verified current).
-Sessions S1–S3 shipped a beautiful but too-short/flat 2-player build with a softlock (resources ran out and
-no action button appeared) — v2 is the grand overhaul that fixes it structurally (Wisp/Steady) + rebuilds
-the loop around a single Ember resource, Brave-or-Steady, and a telegraphing living board.
+## Where we are — S5 THE RECONCEPTION (in progress)
+We are rebuilding GLOAMING from a **euro-puzzle** (v2: abstract Ember, Brave/Steady, a Night
+*meter*, beacons lit by pouring numbers) into a **visible, physical, self-teaching adventure**
+(*Trapped Inside*): the dark eats the board from the edges inward, a Nightmare walks toward the
+nearest torch, you carry 3 Lanterns to the Gate and get everyone out before the center falls.
+**Design law:** the mechanic and the fantasy must be the same thing — every rule is a THING YOU
+SEE. Full spec in `PLAN.md`. **No LLM/Gemini at runtime — deleted.**
 
-## Shipped-state verification (DoD)
-- `npm run typecheck` ✓ · `npm run build` ✓ · dev server **0 console errors** (live + local, `scripts/console-check.mjs`).
-- `npm run referee` ✓ — softlock invariant + PLAN §H; 120 chaos games (2–6p) all terminate.
-- `npm run playtest` — 0 softlocks; win-rate 2p 47% / 3p 47% / 4p 30%; dead-turn 10–22%.
-- Visual: tutorial, setup, and the live board render clean (legal-move glow, place reacts, two Brave/Steady
-  buttons with previews, goal line, Night tide + Acts, party roster). Screenshots in `.shots/` (gitignored).
-- Deployed to Vercel prod (`shv-s-projects/gloaming`, alias `gloaming-murex.vercel.app`); pushed to GitHub
-  (`SHV27/gloaming-game`, master). No secrets in bundle (narrator key is server-only in `api/narrate.ts`).
+## ✅ Done this session
+- **WS1 — Reconception written.** `PLAN.md` rewritten as *Trapped Inside* (five visible pillars,
+  concentric-ring board, the turn ①②③, §H edge cases, §I tests, §J senior calls). `CLAUDE.md`
+  updated (design law + Fresh-Eyes lens + AI-narrator cut + ring-board decision).
+- **WS2 — Engine v3 BUILT, TYPE-CLEAN, BALANCED, SOFTLOCK-FREE.**
+  - `board.ts` — **concentric-ring graph** (rings 1·6·12·12 around the Gate), generated
+    programmatically; `RING_OF`, `OUTER_RING_IDS`, `spreadOuter`, `GATE_ID`.
+  - `types.ts` — GState: `torch`/`wisp`, `lanterns[]` (carry/drop/deliver), `dark[]`+`fraying[]`,
+    `nightmare{nodeId,nextNodeId}`, `act`, `round`, `darkCharge`/`nmCharge` pace accumulators.
+  - `constants.ts` — torch, dark rate (`darkBiteFor` + `darkSlowdownFor`), `nightmareStepsFor`,
+    Act mapping, carry penalty, relight — all tuned.
+  - `effects.ts` — torch/wisp/relight, grab/deliver/drop, `eatFrontier`/`sweepInward`,
+    `nightmareStep`, `applyEventEffect`, `getTileAction` (the single ③ button), `checkGameover`
+    (win first). `events.ts` — 16 **illustrated** cards (icon + ≤4 words + visible effect; no prose).
+  - `gloaming.ts` — moves `rollStride/moveTo/grab/deliver/relight/warm/stepThrough/endTurn`;
+    `onBegin` (torch burn + Wisp auto-drift); `onEnd` (the Dark automa — eat, Nightmare step,
+    one Event/round, Act deepen); dormant `playerView`/Marked scaffolding.
+  - **Deleted** `src/game/narrator.ts` + `api/narrate.ts` (no runtime AI).
+- **WS2b (partial) — Playtester rewritten** (`npm run playtest`, real reducer, greedy co-op bot):
+  **0 softlocks / 300 games**; **win-rate 2p 53% · 3p 57% · 4p 54%** (band 45–55%); nail-biters
+  44–51%; avg ~9–11 rounds; dead-turn 7–17% (rescuable-Wisp drifts — dramatic, not empty).
 
-## The v2 design in one breath
-Single resource **Ember** (life+fuel+currency); **0 → Wisp** (auto-drifts, Rekindle-able → softlock cure).
-Turn = **Roll → Move → place reacts → Brave or Steady → Gloaming acts**. Gloaming = **telegraph→strike**
-cunning automa (SURGE/SEAL/STALK/SNUFF). Beacons are a **tug-of-war** (snuffable). **3 Acts** (Dusk→Gloaming→Pitch).
-Win = all non-Wisp on Threshold with 3 lit; Lose = Night fills. Full spec in `PLAN.md`; references in `RESEARCH_V2.md`.
+## ⚠️ Build state (important for the next session)
+The **engine + playtest are 100% type-clean**, but the **app does NOT compile yet** — the UI still
+imports v2 symbols (Ember/Brave/beacons/night/narrator). That is expected mid-rebuild. The next
+workstream ports the UI to the new model; only then do `typecheck`/`build` go green again.
+UI files needing rewrite: `Board.tsx`, `TurnHud.tsx`, `App.tsx`, `TopBar.tsx`, `DreadTide.tsx`
+(→cut), `EventLog.tsx` (→EventCard), `GameOver.tsx`, `Dice.tsx`, `SetupScreen.tsx`, `Tutorial.tsx`,
+`Atmosphere.tsx`, `RoleReveal.tsx`, `useGameSound.ts`, `sound.ts`, and `referee.ts` (script).
 
-## Done
-- [x] WS1 Foundation: RESEARCH_V2.md, PLAN.md, PROGRESS.md, CLAUDE.md (v2 pillars + Referee/Playtester agents). Committed.
-- [x] WS2 Engine v2: single resource **Ember**; **0→Wisp** (drift + Rekindle) = softlock cure; turn = Roll→Move→React→**Brave/Steady**→Gloaming; **3 Acts**; **beacon tug-of-war**; win = all non-Wisp on Threshold w/ 3 lit, lose = Night fills. All coupled UI rewired (TurnHud rebuilt to two-button + goal line + previews + intent readout; Board/EventLog/GameOver/NightTide/etc.). `typecheck` + `build` green.
-- [x] WS3 Gloaming automa (built into the engine): **telegraph→strike** intents (SURGE/SEAL/STALK/SNUFF), cunning target heuristic, Stalker, snuff cooldown, scaling by Act + player count.
-- [x] Headless Playtester (`npm run playtest`) over the real reducer: **0 softlocks** across 180 games; win-rate **2p 47% · 3p 47% · 4p 30%**; dead-turn 10–22%.
+## ▶ NEXT ACTION
+**WS3 — Rebuild the UI to the visible model** (get the app compiling + playable), in this order:
+1. `Board.tsx` — the centerpiece: draw the ring graph; **the dark eating** (void tiles + `fraying`
+   telegraph); Lanterns (glow on tile / rendered on the carrier's token); the **Nightmare** piece +
+   its glowing `nextNodeId` footprint; the Gate pulsing when 3 delivered; torch guttering; legal-move
+   glow (`reachable(G,me,stride)`) + greyed-with-reason. Keep `Atmosphere.tsx`'s style, re-fit to rings.
+2. `TurnHud.tsx` — the ①②③ walker: Roll → Move (glow) → one ACT button from `getTileAction(G,me)`;
+   torch flame, carry indicator, Wisp state, party roster, "how close is the dark" read. Cut narrator.
+3. `App.tsx` (drop `resetNarrator`), `SetupScreen.tsx`, `GameOver.tsx` (escaped/swallowed),
+   `Dice.tsx`, `EventLog.tsx`→illustrated **EventCard**, `TopBar.tsx`, `useGameSound.ts`/`sound.ts`
+   (map new FlashKinds: step/grab/deliver/dark-eat/nightmare/relight/event/act-change/escape).
+4. Then `scripts/referee.ts` — rewrite assertions for PLAN §H (softlock invariant + all edge cases).
+5. `npm run typecheck` + `build` green, `scripts/console-check.mjs` = 0 console errors.
 
-## Workstream board
-- **WS1 Foundation** — DONE.
-- **WS2 Engine v2** — DONE.
-- **WS3 Gloaming automa** — DONE (folded into engine).
-- **WS4 Clarity + tutorial** — *(next)* goal line ✔(basic, in HUD), legal-move highlight+reasons ✔(board glow + disabled-with-reason), consequence preview ✔(basic); still TODO: rebuild the **teach-by-playing tutorial** for the v2 turn + a one-screen **rules card**; sharpen greyed-move reasons on the board itself.
-- **WS5 Balance** — Playtester sim exists; still TODO: **Referee test suite** (PLAN §H edge cases), close the **4p gap** to ~45–55%, reduce dead-turn (wisp starvation at high count), lengthen to ~12–16 rounds.
-- **WS6 Feel + UI** — Night tide/Acts, beacon ignite/snuff visceral, dice/stalker juice, dedicated sound cues (kindle/snuff/surge/wisp/rekindle), grimoire narration reveal + AI re-skin wiring, responsive, a11y; **verify in headless Chrome** (`scripts/shot.mjs`).
-- **WS7 Ship** — Council+Referee+Playtester gate → DoD → Vercel deploy → README case study.
+Then WS4 (onboarding: SHV splash + wordless cold open + teach-by-playing + how-to card), WS5 (feel/
+sound/a11y), WS6 (Council + Fresh-Eyes + Referee + Playtester gate → DoD → deploy → README/LinkedIn).
 
-## NEXT ACTION
-Two follow-ups remain (game is live and fully playable without them):
-1. **WS5b — finish balance** (`constants.ts` tunables; loop via `npm run playtest`): bring **4p from 30% → ~45–55%** and cut **dead-turn (~10–22% → ~0)**. The 4p difficulty is wisp-starvation from more Gloaming turns/round; likely levers: gentler `emberDrainFor`, a touch more `nightMaxFor` slope at high n, or a smarter sim bot (the bot is greedy, not optimal, so real win-rates run a little higher than the sim). Consider whether the sim "dead-turn" metric should exclude rescuable-Wisp turns (they're dramatic, not contentless).
-2. **WS6 — feel polish**: add dedicated procedural SFX in `audio/sound.ts` (kindle, snuff, surge, wisp, rekindle, cross — currently mapped to reused cues in `useGameSound`); re-introduce the **grimoire narration reveal** for the omen text + wire the AI `narrate()` re-skin (verify current free Gemini model name first); make beacon ignite/snuff more visceral on the board; a11y sweep (keyboard nav, contrast, reduced-motion already honored).
+## Engine v3 gotchas (carry forward)
+- The world reacts in `turn.onEnd` (guard `boardActed`): dark eats (`darkCharge += rate/n`, resolve
+  whole tiles), Nightmare steps (`nmCharge`), and **one Event per round** (at `ctx.playOrderPos===n-1`).
+  Rates are per-ROUND, divided by `n` per turn, so pace is constant across player counts.
+- **Softlock cures (never remove):** `endTurn`/`warm` are always legal after roll; a Wisp turn is an
+  auto-drift to the Gate (`autoWisp`); `getTileAction` always returns an enabled fallback (warm/endTurn).
+- **Grab refuels** the torch (a Lantern is a light source) — this is the whole torch economy; without
+  it players gutter out constantly (was the 5% win-rate bug). Deliver + warm also refuel.
+- Win is checked **before** loss (`checkGameover`): 3 delivered + every player non-Wisp on the Gate =
+  escaped; the dark reaching the Gate = swallowed.
+- `getTileAction` is the SINGLE source of the ③ button — the HUD and the moves must both use it.
+- Length is ~9–11 rounds (bot). If the human playtest feels rushed vs the 20–30 min target, slow
+  `darkBiteFor` base; re-verify win-rate stays 45–55% via `npm run playtest`.
 
-## Open decisions / to-verify
-- **Gemini model name + free limits** — re-verify (web) before the WS7 ship gate; narrator only re-skins, game runs keyless (not blocking earlier WS). AI re-skin is currently unwired in the UI (WS6 reintroduces the grimoire panel + `narrate()`).
-- **Balance is close but not final**: 2p/3p in band, 4p 30% (too hard), dead-turn above 0. Tunables live in `constants.ts`; WS5 auto-research loop converges them + adds the Referee suite. Length ~7–10 rounds now (want ~12–16 → ~25–35 min).
-- Research synthesized from established sources (cited in `RESEARCH_V2.md`) rather than live web fetch, to conserve context; live-volatile facts (model names) flagged above.
-
-## v2 engine gotchas (carry forward)
-- One omen is drawn per turn (`turnOmen`, in `onBegin`); it resolves only if you Brave on a **hollow/hearth**. Special tiles (beacon/well/shrine/threshold) have **intrinsic** Brave actions. `getReaction()` (effects) is the single source the HUD + `brave` move share.
-- `brave`/`steady`/`rekindle` **auto-end the turn** and skip `endTurn` if the move itself wins (so the board can't snuff away a just-completed crossing — but CAN snuff during the multi-turn dash). Win checked before loss in `checkGameover`.
-- **Wisp turn** = `onBegin` sets `autoWisp`, drifts toward Hearth, and the only legal move is `endTurn`; the HUD (and sim) auto-pass it. This is THE softlock guarantee alongside "Steady always legal".
-- SEAL = a **passable but +2-stride** "thorned" road (never a hard block → never a softlock). SNUFF only touches **lit** beacons in **Pitch** (Act 2); in Dusk/Gloaming it claws unlit progress only. Snuff cooldown = `SNUFF_COOLDOWN * numPlayers` turns (≈per-round constant).
-
-## Gotchas carried forward (from CLAUDE §11 — still true)
-- bgio 0.50 move sig `({G,ctx,events,random,playerID},...)`; mutate G or `return INVALID_MOVE`; use `random` plugin.
-- `vite.config` needs `define:{global:'globalThis'}`; never import `boardgame.io/server` into the browser bundle.
-- Headless via `vite-node` (not tsx). Hotseat = one Client, swap `playerID`; Board↔App via `ShellContext`.
-- `playerView` strips other seats' role + nulls `secret.markedId` — never add a per-seat tell to the shared HUD.
-- `api/` is outside tsconfig/src (Vercel builds it); run AI locally with `vercel dev`.
-- Deploy: Vercel project `shv-s-projects/gloaming`, prod alias `gloaming-murex.vercel.app`; CLI needs `--scope shv-s-projects --project gloaming`.
+## Ship facts (carry forward, unchanged)
+- Vercel project `shv-s-projects/gloaming`, prod alias `gloaming-murex.vercel.app`; CLI needs
+  `--scope shv-s-projects --project gloaming`. GitHub `SHV27/gloaming-game`, master. Deploy token in
+  shell env `VERCEL_TOKEN` only (never a file). No runtime secret anymore (narrator removed).
+- bgio 0.50 move sig `({G,ctx,events,random,playerID},...)`; mutate G / `INVALID_MOVE`; `random` plugin.
+- `vite.config` needs `define:{global:'globalThis'}`; headless scripts via `vite-node` (not tsx).

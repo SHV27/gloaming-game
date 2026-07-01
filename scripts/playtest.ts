@@ -1,18 +1,21 @@
 /**
- * GLOAMING v2 — headless Playtester (seed of WS5).
- * Drives the REAL reducer via a local boardgame.io client with a greedy co-op
- * bot, and reports the fun metrics: win-rate, length, dead-turn rate, comebacks.
- * Also the first softlock guard: every game must terminate.
+ * GLOAMING v3 — *Trapped Inside*. Headless Playtester over the REAL reducer.
+ * A greedy co-op bot (≈ a reasonable human: fetch Lanterns, deliver, rescue,
+ * gather, escape) plays many full games per player count and reports the fun
+ * metrics (PLAN §I): win-rate ~45–55%, length ~20–30 min, dead-turn ≈ 0,
+ * comebacks + nail-biters present. Also the softlock guard: every game terminates.
  *
  * Run with the Vite resolver:  npm run playtest
  */
 import { Client } from 'boardgame.io/client';
 import { makeGloaming } from '../src/game/gloaming';
 import type { GState } from '../src/game/types';
-import { isSealed } from '../src/game/effects';
-import { SEAL_STRIDE_COST, REKINDLE_COST, SEAT_NAMES } from '../src/game/constants';
+import { getTileAction, isVoid } from '../src/game/effects';
+import { LANTERN_COUNT, SEAT_NAMES } from '../src/game/constants';
+import { RING_OF } from '../src/game/board';
 
 type AnyClient = ReturnType<typeof Client>;
+const over = (c: AnyClient) => !!c.getState()!.ctx.gameover;
 
 function bfsNextStep(G: GState, from: number, goals: Set<number>): number | null {
   if (goals.has(from)) return null;
@@ -22,7 +25,7 @@ function bfsNextStep(G: GState, from: number, goals: Set<number>): number | null
   while (q.length) {
     const cur = q.shift()!;
     for (const n of G.nodes[cur].neighbors) {
-      if (seen.has(n)) continue;
+      if (seen.has(n) || isVoid(G, n)) continue;
       seen.add(n);
       prev.set(n, cur);
       if (goals.has(n)) {
@@ -36,86 +39,83 @@ function bfsNextStep(G: GState, from: number, goals: Set<number>): number | null
   return null;
 }
 
+/** What this bot wants to reach: deliver if carrying, else fetch a Lantern,
+ *  else rescue a Wisp, else gather at the Gate. */
+function chooseGoals(G: GState, pid: string): number[] {
+  const me = G.players[pid];
+  if (me.carrying.length > 0) return [G.gateId];
+  const onBoard = G.lanterns
+    .filter((l) => !l.delivered && l.carriedBy === null && l.nodeId != null)
+    .map((l) => l.nodeId!);
+  if (onBoard.length) return onBoard;
+  const wisps = Object.values(G.players).filter((p) => p.wisp && p.id !== pid).map((p) => p.nodeId);
+  if (wisps.length && G.lanternsDelivered >= LANTERN_COUNT) return wisps;
+  return [G.gateId];
+}
+
 function moveToward(client: AnyClient, pid: string, goals: number[]): void {
-  const goalSet = new Set(goals);
-  for (let i = 0; i < 10; i++) {
+  const set = new Set(goals);
+  for (let i = 0; i < 12; i++) {
     const st = client.getState()!;
     if (st.ctx.gameover) return;
     const G = st.G as GState;
     const me = G.players[pid];
-    if (goalSet.has(me.nodeId)) return;
-    const next = bfsNextStep(G, me.nodeId, goalSet);
+    if (set.has(me.nodeId) || G.stride < 1) return;
+    const next = bfsNextStep(G, me.nodeId, set);
     if (next === null) return;
-    const cost = isSealed(G, me.nodeId, next) ? SEAL_STRIDE_COST : 1;
-    if (G.stride < cost) return;
+    // don't walk your torch out on frayed tiles unless you must
+    if (G.fraying.includes(next) && me.torch <= 1 && me.nodeId !== next) return;
     client.moves.moveTo(next);
   }
 }
 
-const over = (client: AnyClient) => !!client.getState()!.ctx.gameover;
-
 interface TurnStat {
-  meaningful: boolean; // did the bot make a real choice (not a forced auto-pass)?
+  meaningful: boolean;
+  wisp: boolean;
 }
 
 function takeTurn(client: AnyClient, pid: string, stats: TurnStat[]): void {
   let G = client.getState()!.G as GState;
   if (G.autoWisp) {
     client.moves.endTurn();
-    stats.push({ meaningful: false }); // a Wisp drift — a forced, contentless turn
+    stats.push({ meaningful: false, wisp: true });
     return;
   }
 
   client.moves.rollStride();
-  G = client.getState()!.G as GState;
-  const goals = G.beaconsLit >= 3 ? [G.thresholdId] : G.beacons.filter((b) => !b.lit).map((b) => b.nodeId);
-  moveToward(client, pid, goals);
+  moveToward(client, pid, chooseGoals(G, pid));
   if (over(client)) {
-    stats.push({ meaningful: true });
+    stats.push({ meaningful: true, wisp: false });
     return;
   }
 
   G = client.getState()!.G as GState;
   const me = G.players[pid];
-  const node = G.nodes[me.nodeId];
-
-  // fellowship: lift a fallen ally if we can
-  const wispAlly = Object.values(G.players).find((p) => p.wisp && p.id !== pid && p.nodeId === me.nodeId);
-  if (wispAlly && me.ember >= REKINDLE_COST + 1) {
-    client.moves.rekindle(wispAlly.id);
-    stats.push({ meaningful: true });
+  if (!me || me.wisp) {
+    // guttered out mid-move — the turn auto-passes
+    if (!over(client)) client.moves.endTurn();
+    stats.push({ meaningful: false, wisp: true });
     return;
   }
-
-  // Survival-first greedy: never pour yourself toward a Wisp — bank Ember, and
-  // only kindle a beacon when flush. A "reasonable human" plays this way.
-  const SAFE = 5;
-  let move: 'brave' | 'steady' = 'steady';
-  if (node.type === 'beacon') {
-    const b = G.beacons.find((x) => x.nodeId === node.id);
-    move = b && !b.lit && me.ember >= SAFE ? 'brave' : 'steady';
-  } else if (node.type === 'wellspring') {
-    move = me.ember <= 7 ? 'brave' : 'steady';
-  } else if (node.type === 'threshold') {
-    move = G.beaconsLit >= 3 ? 'brave' : 'steady';
-  } else {
-    // hollow / hearth / shrine — steady is usually the wise play; braving random
-    // omens tends to feed the night. Only gamble with a healthy surplus.
-    move = me.ember >= 10 ? 'brave' : 'steady';
-  }
-  client.moves[move]();
-  stats.push({ meaningful: true });
+  const a = getTileAction(G, me);
+  if (a.enabled && a.kind === 'stepThrough') client.moves.stepThrough();
+  else if (a.enabled && a.kind === 'grab') client.moves.grab();
+  else if (a.enabled && a.kind === 'deliver') client.moves.deliver();
+  else if (a.enabled && a.kind === 'relight' && a.targetId) client.moves.relight(a.targetId);
+  else if (a.enabled && a.kind === 'warm') client.moves.warm();
+  else client.moves.endTurn();
+  stats.push({ meaningful: true, wisp: false });
 }
 
 interface Result {
   winner: string;
   reason: string;
-  turns: number;
-  night: number;
-  nightMax: number;
-  beaconsLit: number;
+  rounds: number;
+  delivered: number;
+  darkFrac: number; // fraction of the board eaten at the end
   deadTurns: number;
   totalTurns: number;
+  nailBiter: boolean;
   softlock: boolean;
 }
 
@@ -127,8 +127,9 @@ function playGame(numPlayers: number): Result {
   const stats: TurnStat[] = [];
   let guard = 0;
   let softlock = false;
+  let minLightIslandLate = Infinity; // how small the surviving island got near the end
   while (!client.getState()!.ctx.gameover) {
-    if (guard++ > 4000) {
+    if (guard++ > 6000) {
       softlock = true;
       break;
     }
@@ -136,21 +137,30 @@ function playGame(numPlayers: number): Result {
     const pid = ctx.currentPlayer;
     client.updatePlayerID(pid);
     takeTurn(client, pid, stats);
+    const G = client.getState()!.G as GState;
+    const alive = G.nodes.filter((n) => !isVoid(G, n.id)).length;
+    if (G.lanternsDelivered >= 2) minLightIslandLate = Math.min(minLightIslandLate, alive);
   }
 
   const s = client.getState()!;
   const go = s.ctx.gameover ?? { winner: 'none', reason: 'softlock' };
   const G = s.G as GState;
-  const deadTurns = stats.filter((t) => !t.meaningful).length;
+  const total = G.nodes.length;
+  const darkFrac = G.dark.length / total;
+  const won = go.winner === 'bearers';
+  // a nail-biter: decided with the dark deep into the inner rings (few tiles left)
+  const innerLeft = G.nodes.filter((n) => !isVoid(G, n.id) && RING_OF[n.id] <= 1).length;
+  const nailBiter = (won || go.reason === 'swallowed') && (darkFrac >= 0.6 || innerLeft <= 3) && minLightIslandLate <= 10;
+
   return {
     winner: go.winner ?? 'none',
     reason: go.reason ?? 'softlock',
-    turns: s.ctx.turn,
-    night: G.night,
-    nightMax: G.nightMax,
-    beaconsLit: G.beaconsLit,
-    deadTurns,
+    rounds: G.round,
+    delivered: G.lanternsDelivered,
+    darkFrac,
+    deadTurns: stats.filter((t) => !t.meaningful).length,
     totalTurns: stats.length,
+    nailBiter,
     softlock,
   };
 }
@@ -159,28 +169,28 @@ function run(numPlayers: number, games: number) {
   const results: Result[] = [];
   for (let i = 0; i < games; i++) results.push(playGame(numPlayers));
 
-  const wins = results.filter((r) => r.winner === 'lanternbearers').length;
+  const wins = results.filter((r) => r.winner === 'bearers').length;
   const softlocks = results.filter((r) => r.softlock).length;
-  const avgTurns = results.reduce((s, r) => s + r.turns, 0) / games;
-  const avgBeacons = results.reduce((s, r) => s + r.beaconsLit, 0) / games;
+  const avgRounds = results.reduce((s, r) => s + r.rounds, 0) / games;
+  const avgDelivered = results.reduce((s, r) => s + r.delivered, 0) / games;
   const totalTurns = results.reduce((s, r) => s + r.totalTurns, 0);
-  const deadTurns = results.reduce((s, r) => s + r.deadTurns, 0);
-  const nailBiters = results.filter((r) => Math.abs(r.night - r.nightMax) <= 3 && r.beaconsLit >= 2).length;
+  const deadWisp = results.reduce((s, r) => s + r.deadTurns, 0);
+  const nail = results.filter((r) => r.nailBiter).length;
 
   console.log(`\n── ${numPlayers} players · ${games} games ─────────────────────`);
   console.log(`  win-rate      ${((wins / games) * 100).toFixed(0)}%  (target 45-55%)`);
-  console.log(`  avg turns     ${avgTurns.toFixed(1)}  (~${(avgTurns / numPlayers).toFixed(1)} rounds)`);
-  console.log(`  avg beacons   ${avgBeacons.toFixed(2)} / 3 lit at end`);
-  console.log(`  dead-turn     ${((deadTurns / totalTurns) * 100).toFixed(1)}%  (target ~0)`);
-  console.log(`  nail-biters   ${((nailBiters / games) * 100).toFixed(0)}%`);
+  console.log(`  avg rounds    ${avgRounds.toFixed(1)}  (~${(avgRounds * numPlayers * 0.4).toFixed(0)} min est.)`);
+  console.log(`  avg delivered ${avgDelivered.toFixed(2)} / ${LANTERN_COUNT}`);
+  console.log(`  dead-turn     ${((deadWisp / totalTurns) * 100).toFixed(1)}%  (Wisp drifts; target low)`);
+  console.log(`  nail-biters   ${((nail / games) * 100).toFixed(0)}%`);
   console.log(`  SOFTLOCKS     ${softlocks}  (MUST be 0)`);
   const reasons: Record<string, number> = {};
   for (const r of results) reasons[r.reason] = (reasons[r.reason] ?? 0) + 1;
   console.log(`  outcomes     `, reasons);
-  return { softlocks };
+  return { softlocks, winRate: wins / games };
 }
 
 let softlockTotal = 0;
-for (const n of [2, 3, 4]) softlockTotal += run(n, 60).softlocks;
+for (const n of [2, 3, 4]) softlockTotal += run(n, 100).softlocks;
 console.log(`\n${softlockTotal === 0 ? 'OK: no softlocks across all games' : `FAIL: ${softlockTotal} SOFTLOCKS`}`);
 process.exit(softlockTotal === 0 ? 0 : 1);

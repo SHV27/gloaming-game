@@ -18,6 +18,14 @@ Three non-negotiables:
 
 If you ever catch yourself shipping the generic, default, or obvious version — stop and raise the bar.
 
+> **THE DESIGN LAW (S5 — binding, supersedes any abstraction):**
+> **THE MECHANIC AND THE FANTASY MUST BE THE SAME THING.** Every rule is a *physical thing the
+> player can SEE happen on the board* (Jumanji: you roll, a lion appears, you run — no layer between).
+> If a rule is a hidden number doing math, it has failed — replace it with a thing that moves, grows,
+> shrinks, or gets eaten. **The world teaches itself** (BOTW/Portal: no rulebook, one concept at a
+> time, learning *is* play) and **the first 60 seconds decide everything** (teach by playing, not
+> reading). The game is **100% self-contained — no LLM/Gemini/AI at runtime.**
+
 ---
 
 ## 1 · The Operating Loop (mandatory, every non-trivial task)
@@ -54,8 +62,9 @@ Before finalizing any significant artifact (a feature, a screen, the core loop),
 1. **🎲 The Game Designer** — Is it *fun*? Check against §6. Real uncertainty? Is the Night clock visible and tightening? Are choices meaningful? Feedback immediate? Flag where it's flat or solved-too-easily.
 2. **🎨 The Art Director** — Does this look like a paid designer made it? Palette cohesion, type hierarchy, motion choreography, spacing, *calibrated* juice. Flag anything that reads as default/templated/stock.
 3. **🛠 The Principal Engineer** — Correctness, edge cases vs PLAN.md, performance, zero console errors, no secrets in code, state integrity. Flag only gaps affecting correctness or stated requirements — **do not over-engineer** or add defensive code for impossible cases.
-4. **⚖️ The Referee (turn-flow integrity — top priority).** Enumerate and **write automated tests** for every edge case, holding the hard invariant: **the current player always has at least one legal action OR the turn auto-resolves/auto-passes — never a softlock** (Ember→0→Wisp; all-Wisp; no legal move; beacon unreachable; Night maxes mid-turn; last beacon snuffed during the dash; simultaneous 0-Ember; refresh/remount; narrator fails mid-event). Each case has a test proving the game continues or ends gracefully. See `PLAN.md` §H.
-5. **🎮 The Playtester / Fun-Evaluator.** A **headless simulator** plays many full games and reports: average length (~25–35 min equiv), **win-rate band ~45–55%**, comeback frequency, nail-biter-finish rate, and **dead-turn rate (≈0)**. Then a gut-check: *"would a 10-year-old be on the edge of their seat? where does it drag?"* Run the §4 loop (propose tuning → simulate → critique → refine) until numbers **and** gut-check pass.
+4. **⚖️ The Referee (turn-flow integrity — top priority).** Enumerate and **write automated tests** for every edge case, holding the hard invariant: **the current player always has at least one legal action OR the turn auto-resolves/auto-passes — never a softlock, never a crash** (torch→0→Wisp; all-Wisp; no legal move / surrounded by dark → End-Turn still legal; a Lantern on a tile the dark eats → swept inward, recoverable; the dark reaching the Gate mid-turn → clean loss; Nightmare + dark hitting the same player same round; 3rd Lantern delivered + Gate eaten same resolution → **win first**; refresh/remount; carrying two Lanterns and getting caught → both drop). Each case has a passing test. See `PLAN.md` §H.
+5. **🎮 The Playtester / Fun-Evaluator.** A **headless simulator** plays many full games and reports: average length (~20–30 min equiv), **win-rate band ~45–55%** per player count, comeback frequency, nail-biter-finish rate, and **dead-turn rate (≈0)** (rescuable-Wisp drifts may be excluded — dramatic, not empty). Then a gut-check: *"would a 10-year-old be on the edge of their seat? where does it drag?"* Run the §4 loop (propose tuning → simulate → critique → refine) until numbers **and** gut-check pass.
+6. **🔍 The Fresh-Eyes Teacher (does the game teach itself? — critical).** A subagent shown *only the screen state each turn, with NO rules given*, that must state "what can I do right now, and why, and what will happen if I do it." If a blind agent can't play correctly from the screen alone, the affordances/legibility have **failed** and must be fixed. This is the objective test of the design law (§0): legible on sight, no reading required.
 
 Then **synthesize** into one priority-ranked list (file + line + fix), apply fixes, re-review the deltas. A reviewer asked to find gaps always finds some; treat taste/correctness gaps as real and the rest as optional. **Referee findings are never optional.**
 
@@ -107,10 +116,9 @@ Repeat until the bar (§0) is met or a sane iteration budget is hit. One agent b
 ## 8 · Security (hard rule — never violate)
 
 - **Secrets live only in the shell environment / Vercel project env vars.** Never in this file, never in committed code.
-  - Local: `export GEMINI_API_KEY=...` and `export VERCEL_TOKEN=...` in the shell before running.
-  - Production: set them in the Vercel project's Environment Variables.
-- The narrator API key is used **only server-side** (the `/api/narrate` function). It must never reach the browser bundle.
-- `.gitignore` must include `.env`, `.env.*`, `.vercel`, and `node_modules` before the first commit.
+  - Local: `export VERCEL_TOKEN=...` in the shell before running. (No runtime secret exists anymore — the AI narrator is deleted.)
+  - Production: set the deploy token in the Vercel project's Environment Variables.
+- `.gitignore` must include `.env`, `.env.*`, `.vercel`, `node_modules`, and `dist`.
 - Treat any secret that has appeared in plaintext anywhere as compromised — rotate it.
 
 ---
@@ -120,8 +128,8 @@ Repeat until the bar (§0) is met or a sane iteration budget is hit. One agent b
 - **App:** Vite + React + TypeScript
 - **Game engine:** `boardgame.io` (local/hotseat multiplayer first — zero backend, instant deploy)
 - **Style/motion/sound:** Tailwind CSS, Framer Motion, Howler.js
-- **Narrator (optional):** Vercel serverless function → Google **Gemini 2.5 Flash** (free tier), with a hand-authored event-deck fallback so the game runs with **no key**.
-- **Deploy:** Vercel (static + serverless). **Repo:** GitHub via `gh`.
+- **Events:** hand-authored **illustrated cards** (icon + ≤4 words + a visible board effect). **No LLM/AI at runtime** — the game is 100% self-contained (the S5 AI narrator was deleted).
+- **Deploy:** Vercel (static). **Repo:** GitHub via `gh`.
 
 ```
 npm run dev         # local dev
@@ -134,11 +142,14 @@ npm run preview     # preview the build
 
 ## 10 · Project Facts
 
-- **Title:** GLOAMING — *The Board That Plays Back*
-- **Players:** 2–6 (hotseat / pass-and-play first; online optional later)
-- **Goal:** Light the **3 Beacons** and reach the **Threshold** before the **Dread** track fills.
-- **Lose:** Dread fills (night falls) — or the hidden **Marked** player completes their secret agenda.
-- **Hook:** the board is a living antagonist; an AI Narrator makes every game a different story.
+- **Title:** GLOAMING — *Trapped Inside* (S5 reconception of *The Board That Plays Back*).
+- **Players:** 2–6 (hotseat / pass-and-play).
+- **Goal:** carry the **3 Lanterns** to the **Gate** (center) and get **everyone out together** before
+  the **dark** eats the board inward and reaches the center. Don't let your **torch** go out, don't get
+  caught by the **Nightmare**, don't leave anyone behind.
+- **Lose:** the dark reaches the Gate (the center falls) — everyone is swallowed.
+- **Hook:** you're trapped inside a board game; the board is a physical, visible antagonist that
+  eats itself toward you — every rule is a thing you watch happen.
 
 ---
 
@@ -165,3 +176,5 @@ npm run preview     # preview the build
 - `2026-07-01` — S4 balance/GOTCHAs (tuned via `npm run playtest` on the real reducer): the Gloaming acts EVERY player-turn, so per-turn mechanics hit harder per ROUND as player count grows — normalize them (snuff cooldown = `SNUFF_COOLDOWN * numPlayers` turns ≈ 1/round; `nightMaxFor` scales with n to hold ~round-count). SNUFF only crushes a LIT beacon in **Pitch** (Act 2); in Dusk/Gloaming it claws unlit progress only — otherwise beacons can never be *banked* and the party can't hold 3. Kindle is bounded (`KINDLE_MAX`) and keeps your last ember (`KINDLE_KEEP`) so pouring into a beacon can't self-Wisp you. Shipped v2 win-rate 2p/3p ~47%, 4p ~30% (4p still too hard — WS5b follow-up). Verify UI has **0 console errors** via `scripts/console-check.mjs` before shipping (caught a framer SVG `cx`-undefined bug — animate the `x` TRANSFORM, never the `cx` ATTRIBUTE).
 - `2026-07-01` — **SHIPPED v2 to prod** (`gloaming-murex.vercel.app`). Vercel CLI had a stored login (no token needed); `.vercel/project.json` links `shv-s-projects/gloaming`. `VERCEL_TOKEN` is NOT in the tool's non-interactive shell even if exported interactively — check `vercel whoami` / the linked project instead.
 - `2026-06-30` — **S4 GRAND OVERHAUL (*The Deepening*) — design pillars now binding (full spec `PLAN.md`):** (1) **single resource Ember** (life+fuel+currency); **0 → Wisp** (auto-drifts toward Hearth, Rekindle-able, cannot Brave) = the structural softlock cure + the simplification. No permadeath — Wisp is the floor. (2) Turn = **Roll → Move → place reacts → Brave or Steady → Gloaming acts**; **Steady is ALWAYS legal** (banks Ember) so a turn can never dead-end. (3) The Gloaming is a **telegraph→strike cunning automa** (SURGE/SEAL/STALK/SNUFF) — it runs on the machine, so it can be smart at zero player bookkeeping; always legible (shows its next intent). (4) **Beacons are a tug-of-war** (snuffable). (5) **3 Acts** Dusk→Gloaming→Pitch escalate the Night clock + Gloaming powers. Win = all non-Wisp on Threshold w/ 3 lit; Lose = Night fills. Two new Council lenses added (§3): **⚖️ Referee** (softlock invariant, automated edge-case tests — never optional) and **🎮 Playtester** (headless fun metrics: length, win-rate 45–55%, comebacks, dead-turn≈0).
+- `2026-07-01` — **S5 THE RECONCEPTION (*Trapped Inside*) — v2 was a euro-puzzle wearing a horror coat; rebuilt around the DESIGN LAW (§0): mechanic = fantasy, every rule a THING YOU SEE.** (1) **THE DARK** = the doom clock, made spatial: it eats the outermost tiles inward each round (telegraphed by `fraying`), herding everyone to the center — replaces the Night meter entirely; loss = it reaches the **Gate** (center). (2) **THE TORCH** = life as a shrinking flame; 0→**Wisp** (drifts to Gate, Relight-able) = softlock cure; refuels at a **Lantern** (grab = a light source) or the Gate. (3) **THE LANTERNS** = 3 physical objects you **carry** (−1 stride each), **drop** when caught/eaten (swept inward, recoverable), **deliver** to the Gate. (4) **THE NIGHTMARE** = one piece that steps toward the nearest torch each round (glowing next-step footprint); catch → drop + knockback + torch snuff. (5) **EVENTS** = illustrated cards (icon + ≤4 words + visible effect) — no prose, **no LLM**. Win = all non-Wisp on the Gate with 3 delivered → step through together. **Board = concentric-ring graph** (rings 1·6·12·12; the dark eats ring-by-ring inward; Act = deepest surviving ring). New Council lens **🔍 Fresh-Eyes** (blind agent plays from the screen alone). AI narrator + `api/narrate.ts` DELETED.
+- `2026-07-01` — S5 engine v3 GOTCHAS: world reacts in `turn.onEnd` (guard `boardActed`) — dark/Nightmare pace via **accumulators** (`darkCharge/nmCharge += perRoundRate/numPlayers`, resolve whole units) so pace is constant across player counts; **one Event per round** at `ctx.playOrderPos===numPlayers-1`. **Grab refuels the torch** — this IS the torch economy (without it players gutter out → 5% win-rate). Delivered Lanterns slow the dark near the Gate (`darkSlowdownFor`) so the final gather is winnable. `getTileAction` is the SINGLE ③-button source (HUD + moves share it). Balanced via `npm run playtest`: 2p 53% / 3p 57% / 4p 54%, 0 softlocks/300 games.

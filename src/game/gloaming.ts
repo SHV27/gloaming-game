@@ -1,34 +1,37 @@
 import type { Game } from 'boardgame.io';
 import { INVALID_MOVE } from 'boardgame.io/core';
-import type { GState, Player, GloamingIntent } from './types';
-import { BOARD, HEARTH_ID, THRESHOLD_ID, BEACON_NODE_IDS } from './board';
-import { OMEN_DECK } from './events';
+import type { GState, Player } from './types';
+import { BOARD, GATE_ID, OUTER_RING_IDS, spreadOuter } from './board';
+import { EVENT_DECK, eventById } from './events';
 import {
-  EMBER_START,
-  nightMaxFor,
-  beaconNeedFor,
-  actFor,
-  emberDrainFor,
-  intentCountFor,
-  NIGHT_TIDE,
-  ACT_NAMES,
-  REKINDLE_COST,
-  REKINDLE_TARGET_EMBER,
+  TORCH_START,
+  TORCH_BURN_PER_ROUND,
+  LANTERN_COUNT,
+  darkBiteFor,
+  darkSlowdownFor,
+  nightmareStepsFor,
   SEAT_NAMES,
   MIN_MARKED_PLAYERS,
 } from './constants';
 import {
   log,
   flash,
-  drainEmber,
-  gainEmber,
-  addNight,
-  strideCostFor,
-  executeIntent,
-  chooseIntent,
+  burnTorch,
+  refuel,
+  grabLantern,
+  deliverAtGate,
+  relight,
+  getTileAction,
+  eatFrontier,
+  nightmareStep,
+  applyEventEffect,
+  refreshAct,
+  retelegraphDark,
+  frontierTiles,
+  isVoid,
+  strideFor,
+  stepTorchCost,
   checkGameover,
-  applyBrave,
-  steadyEmberAt,
 } from './effects';
 
 interface RandomAPI {
@@ -38,7 +41,7 @@ interface RandomAPI {
   Shuffle: <T>(deck: T[]) => T[];
 }
 
-function drawOmen(G: GState, random: RandomAPI): number | null {
+function drawEvent(G: GState, random: RandomAPI): number | null {
   if (G.deck.length === 0) {
     if (G.discard.length === 0) return null;
     G.deck = random.Shuffle(G.discard);
@@ -47,26 +50,32 @@ function drawOmen(G: GState, random: RandomAPI): number | null {
   return G.deck.pop() ?? null;
 }
 
-/** Drift a Wisp one step toward the Hearth (the safe current). */
-function driftToward(G: GState, p: Player, hearthId: number): void {
-  if (p.nodeId === hearthId) return;
-  const h = G.nodes[hearthId];
-  let best = p.nodeId;
-  let bestD = Infinity;
-  for (const m of G.nodes[p.nodeId].neighbors) {
-    const nm = G.nodes[m];
-    const d = (nm.x - h.x) ** 2 + (nm.y - h.y) ** 2;
-    if (d < bestD) {
-      bestD = d;
-      best = m;
+/** One step of a Wisp's drift toward the Gate, over surviving tiles. */
+function driftToGate(G: GState, p: Player): void {
+  if (p.nodeId === GATE_ID) return;
+  const seen = new Set([p.nodeId]);
+  const prev = new Map<number, number>();
+  const q = [p.nodeId];
+  while (q.length) {
+    const cur = q.shift()!;
+    for (const m of G.nodes[cur].neighbors) {
+      if (seen.has(m) || isVoid(G, m)) continue;
+      seen.add(m);
+      prev.set(m, cur);
+      if (m === GATE_ID) {
+        let x = m;
+        while (prev.get(x) !== p.nodeId) x = prev.get(x)!;
+        p.nodeId = x;
+        return;
+      }
+      q.push(m);
     }
   }
-  p.nodeId = best;
 }
 
 export interface GloamingConfig {
   names: string[]; // 2–6 names; length = numPlayers
-  marked?: boolean; // seat one hidden Marked (4+ players)
+  marked?: boolean; // dormant this session (4+)
 }
 
 export function makeGloaming(config: GloamingConfig): Game<GState> {
@@ -91,34 +100,45 @@ export function makeGloaming(config: GloamingConfig): Game<GState> {
           id: String(seat),
           name: nm || SEAT_NAMES[seat] || `Bearer ${seat + 1}`,
           seat,
-          nodeId: HEARTH_ID,
-          ember: EMBER_START,
+          nodeId: GATE_ID, // the party begins at home, in the light
+          torch: TORCH_START,
           wisp: false,
+          carrying: [],
           role: String(seat) === markedId ? 'marked' : 'bearer',
         };
       });
 
-      const ids = OMEN_DECK.map((c) => c.id);
-      const deck = random && random.Shuffle ? random.Shuffle(ids) : ids.slice().reverse();
-      const nightMax = nightMaxFor(names.length);
+      const lanternNodes = spreadOuter(LANTERN_COUNT);
+      const lanterns = lanternNodes.map((nodeId, id) => ({
+        id,
+        nodeId,
+        carriedBy: null,
+        delivered: false,
+      }));
 
-      return {
+      // the Nightmare wakes on the outer ring, away from the Lanterns, and walks in
+      const taken = new Set(lanternNodes);
+      const nmPool = OUTER_RING_IDS.filter((id) => !taken.has(id));
+      const nmStart = nmPool[Math.floor(random.Number() * nmPool.length) % nmPool.length] ?? OUTER_RING_IDS[0];
+
+      const deck = random.Shuffle(EVENT_DECK.map((c) => c.id));
+
+      const G: GState = {
         players,
         nodes,
-        sealedEdges: [],
-        beacons: BEACON_NODE_IDS.map((nodeId) => ({ nodeId, progress: 0, lit: false })),
-        beaconsLit: 0,
-        thresholdId: THRESHOLD_ID,
-        beaconNeed: beaconNeedFor(names.length),
-        night: 0,
-        nightMax,
+        gateId: GATE_ID,
+        lanterns,
+        lanternsDelivered: 0,
+        dark: [],
+        fraying: [],
+        nightmare: { nodeId: nmStart, nextNodeId: null },
         act: 0,
+        round: 1,
+        darkCharge: 0,
+        nmCharge: 0,
         deck,
         discard: [],
-        turnOmen: null,
-        intents: [],
-        stalker: null,
-        snuffCd: 0,
+        lastEvent: null,
         stride: 0,
         hasRolled: false,
         movedThisTurn: false,
@@ -129,23 +149,22 @@ export function makeGloaming(config: GloamingConfig): Game<GState> {
         log: [
           {
             id: 0,
-            turn: 0,
+            turn: 1,
             tone: 'neutral',
-            text: 'Night is coming. Light the three Beacons, gather at the Threshold, and cross — before the dark drowns the world.',
+            text: 'You are trapped inside. The dark eats the edges. Bring the three Lanterns to the Gate — and get everyone out.',
           },
         ],
         logSeq: 1,
         flash: null,
         flashSeq: 1,
         hasMarked: markedId !== null,
-        castOutUsed: false,
-        markedExposed: false,
-        sowedThisTurn: false,
         secret: { markedId },
       };
+      G.fraying = frontierTiles(G, 3); // telegraph the first bite
+      return G;
     },
 
-    // Secret State: each client sees only its OWN role; `secret` is wiped.
+    // Secret State scaffolding (dormant): each client sees only its OWN role.
     playerView: ({ G, playerID }) => ({
       ...G,
       players: Object.fromEntries(
@@ -158,7 +177,7 @@ export function makeGloaming(config: GloamingConfig): Game<GState> {
     }),
 
     turn: {
-      onBegin: ({ G, ctx, random }) => {
+      onBegin: ({ G, ctx }) => {
         G.stride = 0;
         G.hasRolled = false;
         G.movedThisTurn = false;
@@ -166,189 +185,178 @@ export function makeGloaming(config: GloamingConfig): Game<GState> {
         G.boardActed = false;
         G.lastRoll = null;
         G.autoWisp = false;
-        G.turnOmen = null;
         G.flash = null;
-        G.sowedThisTurn = false;
 
         const p = G.players[ctx.currentPlayer];
         if (!p) return;
 
-        // The night gnaws at the active bearer's lantern (the heartbeat drain).
-        drainEmber(G, p, emberDrainFor(G.act));
+        // the night burns a notch off the active torch (may gutter it to a Wisp)
+        if (!p.wisp) burnTorch(G, p, TORCH_BURN_PER_ROUND);
 
         if (p.wisp) {
-          // A Wisp's turn auto-resolves — it drifts and passes. Never a dead end.
+          // a Wisp's turn auto-resolves — it drifts to the Gate and passes. Never a dead end.
           G.autoWisp = true;
           G.hasRolled = true;
           G.acted = true;
-          driftToward(G, p, HEARTH_ID);
-          log(G, `${p.name} drifts on the cold current — a Wisp, seeking the Hearth's warmth.`, 'dread');
-          return;
+          driftToGate(G, p);
+          log(G, `${p.name} drifts on the cold current, seeking the Gate's light.`, 'dread');
         }
-
-        G.turnOmen = drawOmen(G, random as RandomAPI);
       },
 
-      onEnd: ({ G, random }) => {
+      onEnd: ({ G, ctx, random }) => {
         if (G.boardActed) return; // idempotency guard
         G.boardActed = true;
+        const n = Object.keys(G.players).length;
 
-        // the turn's omen passes if it went unbraved
-        if (G.turnOmen != null) {
-          G.discard.push(G.turnOmen);
-          G.turnOmen = null;
+        // 1 · the dark eats the edge inward (normalised per round; delivered Lanterns
+        //     hold it back near the Gate → the climactic gather is winnable)
+        G.darkCharge += (darkBiteFor(G.act, n) * darkSlowdownFor(G.lanternsDelivered)) / n;
+        const eat = Math.floor(G.darkCharge);
+        if (eat > 0) {
+          G.darkCharge -= eat;
+          eatFrontier(G, eat);
         }
 
-        // 1 · the Gloaming carries out what it telegraphed last turn
-        for (const it of G.intents) executeIntent(G, it, random as RandomAPI);
-        G.intents = [];
-        if (G.snuffCd > 0) G.snuffCd--; // the snuff cooldown ticks down each board phase
-
-        // 2 · the tide always rises (the knowable clock)
-        addNight(G, NIGHT_TIDE);
-
-        // 3 · the night may deepen into the next Act
-        const prevAct = G.act;
-        G.act = actFor(G.night, G.nightMax);
-        if (G.act > prevAct) {
-          flash(G, 'act-change');
-          log(G, `${ACT_NAMES[G.act]} falls. The Gloaming grows bolder.`, 'dread');
+        // 2 · the Nightmare walks toward the nearest torch (normalised)
+        G.nmCharge += nightmareStepsFor(G.act) / n;
+        const steps = Math.floor(G.nmCharge);
+        if (steps > 0) {
+          G.nmCharge -= steps;
+          for (let i = 0; i < steps; i++) nightmareStep(G);
+        } else if (G.nightmare.nextNodeId === null) {
+          // keep the footprint telegraph fresh even on a no-step turn
+          nightmareStep(G);
+          G.nmCharge = Math.max(0, G.nmCharge - 1);
         }
 
-        // 4 · choose + telegraph the next strike(s) (cunning, but you see it coming)
-        const k = intentCountFor(G.act);
-        const next: GloamingIntent[] = [];
-        for (let i = 0; i < k; i++) {
-          const it = chooseIntent(G, random as RandomAPI);
-          // avoid telegraphing the same beacon-snuff twice in one breath
-          if (next.some((q) => q.kind === it.kind && q.beaconNodeId === it.beaconNodeId && it.kind === 'snuff')) {
-            next.push({ kind: 'surge', telegraph: 'The night gathers itself to surge.' });
-          } else next.push(it);
+        refreshAct(G);
+        retelegraphDark(G, n);
+
+        // 3 · one Event card flips per round (at the round boundary)
+        if (ctx.playOrderPos === n - 1) {
+          const id = drawEvent(G, random as RandomAPI);
+          if (id !== null) {
+            G.lastEvent = id;
+            const card = eventById(id);
+            applyEventEffect(G, card, random as RandomAPI);
+            flash(G, 'event');
+            log(G, `The dark plays a card: ${card.words}.`, card.tone === 'hope' ? 'hope' : 'dread');
+            G.discard.push(id);
+            refreshAct(G);
+            retelegraphDark(G, n);
+          }
+          G.round += 1;
         }
-        G.intents = next;
       },
     },
 
     moves: {
-      // — roll the Stride die (opens the turn) —
+      // ① ROLL — opens the turn (carrying Lanterns shortens the stride) —
       rollStride: ({ G, ctx, random }) => {
         const p = G.players[ctx.currentPlayer];
         if (!p || p.wisp || G.autoWisp) return INVALID_MOVE;
         if (G.hasRolled || G.acted) return INVALID_MOVE;
         const r = random.D6();
-        G.stride = r;
         G.lastRoll = r;
+        G.stride = strideFor(r, p.carrying.length);
         G.hasRolled = true;
         flash(G, 'dice');
       },
 
-      // — move one node along an edge, spending stride (sealed roads cost more) —
+      // ② MOVE — one tile along a surviving edge; frayed tiles bite your torch —
       moveTo: ({ G, ctx }, nodeId: number) => {
         const p = G.players[ctx.currentPlayer];
         if (!p || p.wisp || G.autoWisp) return INVALID_MOVE;
         if (!G.hasRolled || G.acted) return INVALID_MOVE;
         if (!G.nodes[p.nodeId].neighbors.includes(nodeId)) return INVALID_MOVE;
-        const cost = strideCostFor(G, p.nodeId, nodeId);
-        if (G.stride < cost) return INVALID_MOVE;
-        G.stride -= cost;
+        if (isVoid(G, nodeId)) return INVALID_MOVE; // the dark is not a path
+        if (G.stride < 1) return INVALID_MOVE;
+        G.stride -= 1;
         p.nodeId = nodeId;
         G.movedThisTurn = true;
-      },
-
-      // — BRAVE: the bold, contextual play (then the board takes its turn) —
-      brave: {
-        move: ({ G, ctx, events, random }) => {
-          const p = G.players[ctx.currentPlayer];
-          if (!p || p.wisp || G.autoWisp) return INVALID_MOVE;
-          if (!G.hasRolled || G.acted) return INVALID_MOVE;
-          const node = G.nodes[p.nodeId];
-
-          if (node.type === 'threshold') {
-            if (G.beaconsLit < 3) return INVALID_MOVE; // the gate is sealed
-            log(G, `${p.name} steps to the very edge of the dawn and waits for the others.`, 'hope');
-          } else {
-            const ok = applyBrave(G, p, random as RandomAPI);
-            if (!ok) return INVALID_MOVE;
-          }
+        burnTorch(G, p, stepTorchCost(G, nodeId)); // stepping the cold edge costs warmth
+        flash(G, 'step', nodeId);
+        if (p.wisp) {
+          // guttered out mid-move → becomes a Wisp; turn will pass
+          G.autoWisp = true;
           G.acted = true;
-          if (!checkGameover(G)) events.endTurn(); // let a winning move win before the board strikes
-        },
-        undoable: false,
+        }
       },
 
-      // — STEADY: the always-legal safe floor (+Ember) — no turn can dead-end —
-      steady: {
+      // ③ ACT — Grab a Lantern here (then the board takes its turn) —
+      grab: {
         move: ({ G, ctx, events }) => {
           const p = G.players[ctx.currentPlayer];
-          if (!p || p.wisp || G.autoWisp) return INVALID_MOVE;
-          if (!G.hasRolled || G.acted) return INVALID_MOVE;
-          gainEmber(p, steadyEmberAt(G, p));
+          if (!p || p.wisp || G.autoWisp || !G.hasRolled || G.acted) return INVALID_MOVE;
+          if (!grabLantern(G, p)) return INVALID_MOVE;
           G.acted = true;
-          log(G, `${p.name} steadies the flame and breathes. The lantern holds.`, 'hope');
           if (!checkGameover(G)) events.endTurn();
         },
         undoable: false,
       },
 
-      // — REKINDLE a fallen ally on your node (fellowship; spends your Ember) —
-      rekindle: {
+      // ③ ACT — Deliver carried Lanterns at the Gate —
+      deliver: {
+        move: ({ G, ctx, events }) => {
+          const p = G.players[ctx.currentPlayer];
+          if (!p || p.wisp || G.autoWisp || !G.hasRolled || G.acted) return INVALID_MOVE;
+          if (!deliverAtGate(G, p)) return INVALID_MOVE;
+          G.acted = true;
+          if (!checkGameover(G)) events.endTurn();
+        },
+        undoable: false,
+      },
+
+      // ③ ACT — Relight a fallen ally sharing your tile (fellowship) —
+      relight: {
         move: ({ G, ctx, events }, targetId: string) => {
           const p = G.players[ctx.currentPlayer];
-          const t = G.players[targetId];
-          if (!p || p.wisp || G.autoWisp) return INVALID_MOVE;
-          if (!G.hasRolled || G.acted) return INVALID_MOVE;
-          if (!t || t.id === p.id || !t.wisp) return INVALID_MOVE;
-          if (t.nodeId !== p.nodeId) return INVALID_MOVE;
-          if (p.ember < REKINDLE_COST + 1) return INVALID_MOVE; // keep enough to not gutter out yourself
-          p.ember -= REKINDLE_COST;
-          t.wisp = false;
-          t.ember = REKINDLE_TARGET_EMBER;
-          flash(G, 'rekindle', t.nodeId);
-          log(G, `${p.name} cups their hands and breathes ${t.name} back into the light.`, 'fellow');
+          if (!p || p.wisp || G.autoWisp || !G.hasRolled || G.acted) return INVALID_MOVE;
+          if (!relight(G, p, targetId)) return INVALID_MOVE;
           G.acted = true;
           if (!checkGameover(G)) events.endTurn();
         },
         undoable: false,
       },
 
-      // — pass the turn (Wisp auto-drift, or an explicit skip after acting) —
-      endTurn: ({ G, events }) => {
-        if (!G.autoWisp && !G.acted) return INVALID_MOVE;
-        events.endTurn();
-      },
-
-      // — the party's one accusation against a suspected Marked (4+) —
-      castOut: {
-        move: ({ G, ctx }, targetId: string) => {
+      // ③ ACT — Warm your torch at the Gate (the always-there refuel) —
+      warm: {
+        move: ({ G, ctx, events }) => {
           const p = G.players[ctx.currentPlayer];
-          const t = G.players[targetId];
-          if (!G.hasMarked || G.castOutUsed) return INVALID_MOVE;
-          if (!p || p.wisp || G.autoWisp) return INVALID_MOVE;
-          if (!t || t.id === p.id) return INVALID_MOVE;
-          G.castOutUsed = true;
-          if (t.role === 'marked') {
-            G.markedExposed = true;
-            addNight(G, -4);
-            log(G, `The circle turns on ${t.name} — and the dark recoils. ${t.name} was Marked. Their hand is stilled.`, 'fellow');
-          } else {
-            addNight(G, 4);
-            log(G, `${p.name} accuses ${t.name} — but the dark only laughs. No traitor, and the night gains.`, 'dread');
-          }
+          if (!p || p.wisp || G.autoWisp || !G.hasRolled || G.acted) return INVALID_MOVE;
+          if (p.nodeId !== G.gateId) return INVALID_MOVE;
+          refuel(p);
+          log(G, `${p.name} warms their torch at the Gate — the flame stands tall again.`, 'hope');
+          G.acted = true;
+          if (!checkGameover(G)) events.endTurn();
         },
         undoable: false,
       },
 
-      // — the Marked's covert sabotage (Marked-only; feeds the night) —
-      sow: ({ G, ctx }) => {
+      // ③ ACT — Step Through the Gate (the win, when the party is whole) —
+      stepThrough: {
+        move: ({ G, ctx, events }) => {
+          const p = G.players[ctx.currentPlayer];
+          if (!p || p.wisp || G.autoWisp || !G.hasRolled || G.acted) return INVALID_MOVE;
+          const a = getTileAction(G, p);
+          if (a.kind !== 'stepThrough' || !a.enabled) return INVALID_MOVE;
+          flash(G, 'escape', G.gateId);
+          log(G, 'Hand in hand, the bearers step through the Gate — into the dawn. You made it. Together.', 'hope');
+          G.acted = true;
+          if (!checkGameover(G)) events.endTurn();
+        },
+        undoable: false,
+      },
+
+      // pass the turn (Wisp auto-drift, or an explicit skip after rolling) —
+      endTurn: ({ G, ctx, events }) => {
         const p = G.players[ctx.currentPlayer];
-        if (!p || p.wisp || G.autoWisp) return INVALID_MOVE;
-        if (p.role !== 'marked' || G.markedExposed) return INVALID_MOVE;
-        if (G.sowedThisTurn) return INVALID_MOVE;
-        if (p.ember <= 2) return INVALID_MOVE; // can't sow yourself to a Wisp
-        G.sowedThisTurn = true;
-        addNight(G, 1);
-        drainEmber(G, p, 1); // self-cost — sow too greedily and you gutter (a tell)
-        log(G, 'A chill that belongs to no season deepens. The dark gains, somehow.', 'dread');
+        if (!G.autoWisp) {
+          if (!p || p.wisp) return INVALID_MOVE;
+          if (!G.hasRolled) return INVALID_MOVE; // roll first — keeps the ①②③ order honest
+        }
+        G.acted = true;
+        events.endTurn();
       },
     },
 

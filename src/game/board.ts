@@ -1,47 +1,116 @@
 import type { BoardNode } from './types';
 
 /**
- * The Gloaming board — a hand-designed graph on a 1000×680 viewBox.
- * Irregular web so routing is a real choice: the North beacon (12) sits on the
- * road to the Threshold, but West (4) and East (8) demand detours through a
- * Shrine — so the party must split or commit. Adjacency is explicit (`neighbors`),
- * never index math (RESEARCH §2). All edges verified symmetric.
+ * GLOAMING v3 — *Trapped Inside*. The board is a **concentric-ring graph** so the
+ * one thing the game is about — the dark eating the edge inward and herding everyone
+ * to the center — is native to the geometry (PLAN §D). Ring 0 is the Gate (home +
+ * refuel + deliver + escape). Rings spiral out; the dark consumes the outermost
+ * surviving tiles each round. Generated programmatically so it is symmetric and the
+ * ring sizes are a single tunable. Every node has a path inward → no unreachable tile.
  */
-export const BOARD_W = 1000;
-export const BOARD_H = 680;
+export const BOARD_W = 960;
+export const BOARD_H = 960;
+const CX = BOARD_W / 2;
+const CY = BOARD_H / 2;
 
-export const BOARD: BoardNode[] = [
-  { id: 0, x: 500, y: 610, type: 'hearth', neighbors: [1, 2, 11], label: 'The Hearth' },
+/** Ring sizes (index = ring). Ring 0 is the single center Gate. Outer ring = Lanterns. */
+export const RING_SIZES = [1, 6, 12, 12] as const;
+export const OUTER_RING = RING_SIZES.length - 1;
+const RING_RADIUS = [0, 150, 300, 435] as const;
+/** A small per-ring angular offset so rings interleave into a spiderweb, not spokes. */
+const RING_OFFSET = [0, -Math.PI / 2, -Math.PI / 2 + Math.PI / 12, -Math.PI / 2] as const;
 
-  { id: 1, x: 310, y: 520, type: 'hollow', neighbors: [0, 3, 6] },
-  { id: 2, x: 690, y: 520, type: 'hollow', neighbors: [0, 7, 10] },
+interface GenNode extends BoardNode {
+  ring: number;
+  angle: number; // radians, for eat-order + placement
+}
 
-  { id: 3, x: 165, y: 425, type: 'wellspring', neighbors: [1, 5, 6], label: 'Westwell' },
-  { id: 7, x: 835, y: 425, type: 'wellspring', neighbors: [2, 9, 10], label: 'Eastwell' },
+/** Angular distance between two angles, in [0, π]. */
+function angDist(a: number, b: number): number {
+  let d = Math.abs(a - b) % (Math.PI * 2);
+  if (d > Math.PI) d = Math.PI * 2 - d;
+  return d;
+}
 
-  { id: 5, x: 250, y: 330, type: 'shrine', neighbors: [3, 4, 6], label: 'Pale Shrine' },
-  { id: 9, x: 750, y: 330, type: 'shrine', neighbors: [7, 8, 10], label: 'Hollow Shrine' },
+const gen: GenNode[] = (() => {
+  const nodes: GenNode[] = [];
+  const byRing: number[][] = RING_SIZES.map(() => []);
+  let id = 0;
 
-  { id: 4, x: 95, y: 290, type: 'beacon', neighbors: [5], label: 'West Beacon' },
-  { id: 8, x: 905, y: 290, type: 'beacon', neighbors: [9], label: 'East Beacon' },
+  RING_SIZES.forEach((count, ring) => {
+    for (let i = 0; i < count; i++) {
+      const angle = ring === 0 ? 0 : RING_OFFSET[ring] + (i / count) * Math.PI * 2;
+      const r = RING_RADIUS[ring];
+      nodes.push({
+        id,
+        x: Math.round(CX + r * Math.cos(angle)),
+        y: Math.round(CY + r * Math.sin(angle)),
+        type: ring === 0 ? 'gate' : 'tile',
+        neighbors: [],
+        ring,
+        angle,
+        label: ring === 0 ? 'The Gate' : undefined,
+      });
+      byRing[ring].push(id);
+      id++;
+    }
+  });
 
-  { id: 6, x: 390, y: 375, type: 'hollow', neighbors: [1, 3, 5, 11, 13] },
-  { id: 10, x: 610, y: 375, type: 'hollow', neighbors: [2, 7, 9, 11, 15] },
-  { id: 11, x: 500, y: 455, type: 'hollow', neighbors: [0, 6, 10, 12] },
+  const link = (a: number, b: number) => {
+    if (a === b) return;
+    if (!nodes[a].neighbors.includes(b)) nodes[a].neighbors.push(b);
+    if (!nodes[b].neighbors.includes(a)) nodes[b].neighbors.push(a);
+  };
 
-  { id: 12, x: 500, y: 205, type: 'beacon', neighbors: [11, 13, 15, 14], label: 'North Beacon' },
+  RING_SIZES.forEach((count, ring) => {
+    const ids = byRing[ring];
+    // circular neighbours within the ring (ring 0 has none)
+    if (ring > 0 && count > 1) {
+      for (let i = 0; i < count; i++) link(ids[i], ids[(i + 1) % count]);
+    }
+    // link each node to its nearest node in the adjacent inner ring (guarantees an inward path)
+    if (ring > 0) {
+      const inner = byRing[ring - 1];
+      for (const nid of ids) {
+        let best = inner[0];
+        let bestD = Infinity;
+        for (const iid of inner) {
+          const d = angDist(nodes[nid].angle, nodes[iid].angle);
+          if (d < bestD) {
+            bestD = d;
+            best = iid;
+          }
+        }
+        link(nid, best);
+      }
+    }
+  });
 
-  { id: 13, x: 375, y: 250, type: 'hollow', neighbors: [6, 12, 14] },
-  { id: 15, x: 625, y: 250, type: 'hollow', neighbors: [10, 12, 14] },
+  return nodes;
+})();
 
-  { id: 14, x: 500, y: 85, type: 'threshold', neighbors: [12, 13, 15], label: 'The Threshold' },
-];
+export const BOARD: BoardNode[] = gen.map((n) => ({
+  id: n.id,
+  x: n.x,
+  y: n.y,
+  type: n.type,
+  neighbors: [...n.neighbors].sort((a, b) => a - b),
+  label: n.label,
+}));
 
-export const BEACON_NODE_IDS = BOARD.filter((n) => n.type === 'beacon').map((n) => n.id);
-export const THRESHOLD_ID = BOARD.find((n) => n.type === 'threshold')!.id;
-export const HEARTH_ID = BOARD.find((n) => n.type === 'hearth')!.id;
+/** ring index per node id (drives the dark's eat-order + Act, and placement). */
+export const RING_OF: number[] = gen.map((n) => n.ring);
+/** angle per node id (for even Lantern spacing on the outer ring). */
+export const ANGLE_OF: number[] = gen.map((n) => n.angle);
 
-/** Unique undirected edges, for rendering and corruption. */
+export const GATE_ID = BOARD.find((n) => n.type === 'gate')!.id;
+/** Node ids of the outer ring, evenly ordered by angle (where Lanterns spawn). */
+export const OUTER_RING_IDS: number[] = gen
+  .filter((n) => n.ring === OUTER_RING)
+  .sort((a, b) => a.angle - b.angle)
+  .map((n) => n.id);
+
+/** Unique undirected edges, for rendering. */
 export const EDGES: Array<[number, number]> = (() => {
   const seen = new Set<string>();
   const out: Array<[number, number]> = [];
@@ -63,4 +132,14 @@ export function nodeById(nodes: BoardNode[], id: number): BoardNode {
 
 export function edgeKey(a: number, b: number): string {
   return a < b ? `${a}-${b}` : `${b}-${a}`;
+}
+
+/** Pick `count` outer-ring node ids spread as evenly as possible (Lantern spawns). */
+export function spreadOuter(count: number): number[] {
+  const ids = OUTER_RING_IDS;
+  if (count >= ids.length) return ids.slice();
+  const step = ids.length / count;
+  const out: number[] = [];
+  for (let i = 0; i < count; i++) out.push(ids[Math.floor(i * step) % ids.length]);
+  return out;
 }
