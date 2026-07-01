@@ -6,10 +6,12 @@
 ---
 
 ## Where we are
-**v2 (The Deepening) is BUILT, TESTED, and SHIPPED to production.** Live: https://gloaming-murex.vercel.app
+**v2 (The Deepening) is BUILT, TESTED, POLISHED, and SHIPPED to production.** Live: https://gloaming-murex.vercel.app
 Done: WS1 (foundation), WS2 (engine v2), WS3 (Gloaming automa), WS4 (tutorial/clarity), WS5a (Referee suite),
-WS7 (README case study + deploy + 0 console errors). Remaining polish: **WS5b** (finish balance — the 4p gap
-+ dead-turn) and **WS6** (deeper feel — dedicated sound cues, grimoire narration + AI re-skin wiring, a11y).
+WS6 (feel — 6 dedicated SFX, grimoire narrator + AI re-skin wiring, on-board telegraphs, a11y), WS7 (README
+case study + deploy + 0 console errors). **Only remaining item: WS5b** (4p balance — currently 30%, which the
+owner has accepted as fine). The AI narrator is wired but DORMANT in prod until a `GEMINI_API_KEY` is added to
+the Vercel project env (game runs fully keyless on the hand-authored deck; `gemini-2.5-flash` verified current).
 Sessions S1–S3 shipped a beautiful but too-short/flat 2-player build with a softlock (resources ran out and
 no action button appeared) — v2 is the grand overhaul that fixes it structurally (Wisp/Steady) + rebuilds
 the loop around a single Ember resource, Brave-or-Steady, and a telegraphing living board.
