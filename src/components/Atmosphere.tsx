@@ -96,13 +96,15 @@ export function Atmosphere({ ratio, reduce }: { ratio: number; reduce: boolean }
 
       {/* drifting fog banks */}
       <g style={{ filter: 'blur(16px)' }} opacity={fog}>
+        {/* NB: animate the x TRANSFORM, not the cx ATTRIBUTE — framer emits an
+            undefined cx on first paint otherwise (an SVG console error). */}
         <motion.ellipse
           cx={300}
           cy={430}
           rx={380}
           ry={130}
           fill="url(#atmo-fog)"
-          animate={reduce ? undefined : { cx: [240, 760, 240] }}
+          animate={reduce ? undefined : { x: [-60, 460, -60] }}
           transition={reduce ? undefined : { duration: 46, repeat: Infinity, ease: 'easeInOut' }}
         />
         <motion.ellipse
@@ -111,7 +113,7 @@ export function Atmosphere({ ratio, reduce }: { ratio: number; reduce: boolean }
           rx={320}
           ry={110}
           fill="url(#atmo-fog)"
-          animate={reduce ? undefined : { cx: [820, 260, 820] }}
+          animate={reduce ? undefined : { x: [100, -460, 100] }}
           transition={reduce ? undefined : { duration: 58, repeat: Infinity, ease: 'easeInOut' }}
         />
         <motion.ellipse
@@ -120,7 +122,7 @@ export function Atmosphere({ ratio, reduce }: { ratio: number; reduce: boolean }
           rx={460}
           ry={120}
           fill="url(#atmo-fog)"
-          animate={reduce ? undefined : { cx: [560, 380, 560] }}
+          animate={reduce ? undefined : { x: [60, -120, 60] }}
           transition={reduce ? undefined : { duration: 70, repeat: Infinity, ease: 'easeInOut' }}
         />
       </g>
