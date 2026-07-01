@@ -16,11 +16,6 @@ const COPY: Record<
     line: 'The tide reaches the last of the light and pulls it under. The Gloaming was patient, and the Gloaming has won.',
     tone: 'lose',
   },
-  'all-lost': {
-    title: 'No One Remains',
-    line: 'One by one the lanterns went out. The board keeps its silence, and its new and quiet guests.',
-    tone: 'lose',
-  },
   'marked-foiled': {
     title: 'The Threshold Opens',
     line: 'The true bearers cross into the dawn — and the one who walked among them, willing the dark to win, is left behind on the wrong side of the light.',
@@ -101,8 +96,8 @@ export function GameOver({
           <span>{G.beaconsLit}/3 beacons lit</span>
           <span className="text-haze">·</span>
           <span>
-            {Object.values(G.players).filter((p) => p.alive).length}/
-            {Object.values(G.players).length} bearers stood
+            {Object.values(G.players).filter((p) => !p.wisp).length}/
+            {Object.values(G.players).length} bearers still alight
           </span>
         </div>
 

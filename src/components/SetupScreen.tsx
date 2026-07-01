@@ -5,7 +5,7 @@ import { sound } from '../audio/sound';
 import { Tutorial, tutorialSeen, markTutorialSeen } from './Tutorial';
 
 const MIN = 2;
-const MAX = 4; // S1 slice; S2 raises to 6
+const MAX = 6;
 const MIN_MARKED = 4; // the Marked is offered at 4+ seats
 
 export interface StartOpts {

@@ -13,19 +13,22 @@ export function useGameSound(flash: Flash | null): void {
         sound.play('dice');
         break;
       case 'beacon-lit':
+      case 'rekindle':
+      case 'cross':
         sound.play('beacon');
         break;
-      case 'dread-strike':
+      case 'snuff':
+      case 'surge':
+      case 'act-change':
         sound.play('dread');
         break;
-      case 'dimmed':
+      case 'wisp':
         sound.play('dimmed');
         break;
       case 'stalker':
         sound.play('stalker');
         break;
       case 'kindle':
-      case 'item':
         sound.play('ui');
         break;
     }

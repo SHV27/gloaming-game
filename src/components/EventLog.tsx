@@ -33,20 +33,24 @@ export function EventLog({ G, currentPlayer }: { G: GState; currentPlayer: strin
               <span className="flex items-center gap-2">
                 <span
                   className="h-2.5 w-2.5 rounded-full"
-                  style={{ background: p.alive ? SEAT_COLORS[p.seat] : '#3a3550', opacity: p.dimmed ? 0.4 : 1 }}
+                  style={{ background: p.wisp ? '#3a3550' : SEAT_COLORS[p.seat], opacity: p.wisp ? 0.5 : 1 }}
                 />
                 <span
                   className="font-display text-xs"
-                  style={{ color: p.alive ? SEAT_COLORS[p.seat] : '#6b6589' }}
+                  style={{ color: p.wisp ? '#8a84a8' : SEAT_COLORS[p.seat] }}
                 >
                   {p.name}
                 </span>
-                {p.dimmed && <span className="text-[10px] text-dread-bright">dimmed</span>}
-                {!p.alive && <span className="text-[10px] text-fog-dim">lost</span>}
+                {p.wisp && <span className="text-[10px] text-dread-bright">a Wisp</span>}
               </span>
               <span className="font-display text-[11px] text-fog">
-                <span className="text-ember-bright">{'✦'.repeat(Math.min(p.embers, 6)) || '·'}</span>
-                <span className="ml-1 text-ember/70">{p.light}♦</span>
+                {p.wisp ? (
+                  <span className="text-fog-dim italic">drifting…</span>
+                ) : (
+                  <span className="text-ember-bright" title={`${p.ember} Ember`}>
+                    {'✦'.repeat(Math.min(p.ember, 8)) || '·'}
+                  </span>
+                )}
               </span>
             </div>
           ))}

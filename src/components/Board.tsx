@@ -2,12 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence, useAnimationControls, useReducedMotion } from 'framer-motion';
 import type { BoardProps } from 'boardgame.io/react';
 import type { GState, BoardNode } from '../game/types';
-import { BOARD_W, BOARD_H, EDGES, edgeKey } from '../game/board';
-import { SEAT_COLORS, EMBERS_PER_BEACON } from '../game/constants';
-import { dreadFilter, DreadTide } from './DreadTide';
+import { BOARD_W, BOARD_H, EDGES } from '../game/board';
+import { SEAT_COLORS } from '../game/constants';
+import { isSealed, strideCostFor } from '../game/effects';
+import { nightFilter, NightTide } from './DreadTide';
 import { TurnHud } from './TurnHud';
 import { EventLog } from './EventLog';
-import { NarratorPanel } from './NarratorPanel';
 import { HandoffScreen } from './HandoffScreen';
 import { GameOver } from './GameOver';
 import { RoleReveal } from './RoleReveal';
@@ -48,11 +48,6 @@ function edgePath(ax: number, ay: number, bx: number, by: number, seed: number):
   return `M ${ax} ${ay} Q ${cx} ${cy} ${bx} ${by}`;
 }
 
-function isCorruptedEdge(G: GState, a: number, b: number) {
-  const k = edgeKey(a, b);
-  return G.corruptedEdges.some(([x, y]) => edgeKey(x, y) === k);
-}
-
 export function GloamingBoard(props: BoardProps<GState>) {
   const { G, ctx, moves, playerID } = props;
   const shell = useShell();
@@ -61,22 +56,25 @@ export function GloamingBoard(props: BoardProps<GState>) {
   const shake = useAnimationControls();
   const lastStrike = useRef(-1);
 
-  // tapered board shake on a Dread strike (RESEARCH §3C)
+  // tapered board shake when the Gloaming lands a blow (RESEARCH §4)
+  const IMPACT = new Set(['snuff', 'surge', 'stalker', 'act-change']);
   useEffect(() => {
-    if (!G.flash || G.flash.kind !== 'dread-strike') return;
+    if (!G.flash || !IMPACT.has(G.flash.kind)) return;
     if (G.flash.nonce === lastStrike.current) return;
     lastStrike.current = G.flash.nonce;
+    const hard = G.flash.kind === 'snuff' || G.flash.kind === 'act-change';
     shake.start({
-      x: [0, -7, 6, -4, 3, 0],
-      y: [0, 4, -3, 2, -1, 0],
-      transition: { duration: 0.4, ease: 'easeOut' },
+      x: [0, hard ? -9 : -6, hard ? 8 : 5, -4, 3, 0],
+      y: [0, hard ? 5 : 3, -3, 2, -1, 0],
+      transition: { duration: hard ? 0.5 : 0.4, ease: 'easeOut' },
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [G.flash, shake]);
 
   const myTurn = playerID === ctx.currentPlayer && !ctx.gameover;
   const me = playerID ? G.players[playerID] : undefined;
   const reduce = !!useReducedMotion();
-  const dreadRatio = Math.min(1, G.dread / G.dreadMax);
+  const nightRatio = Math.min(1, G.night / G.nightMax);
 
   // win/lose sting (once)
   const stungRef = useRef(false);
@@ -89,11 +87,11 @@ export function GloamingBoard(props: BoardProps<GState>) {
 
   // the Dread heartbeat — quickens as night nears (only once it's felt)
   useEffect(() => {
-    if (reduce || ctx.gameover || dreadRatio < 0.42) return;
-    const interval = Math.max(680, 1850 - dreadRatio * 1250);
+    if (reduce || ctx.gameover || nightRatio < 0.42) return;
+    const interval = Math.max(680, 1850 - nightRatio * 1250);
     const id = setInterval(() => sound.play('heartbeat'), interval);
     return () => clearInterval(id);
-  }, [dreadRatio, reduce, ctx.gameover]);
+  }, [nightRatio, reduce, ctx.gameover]);
 
   // The Marked's private one-time reveal (after handoff; never the prev player).
   const [ackedMarked, setAckedMarked] = useState<Record<string, boolean>>({});
@@ -113,11 +111,10 @@ export function GloamingBoard(props: BoardProps<GState>) {
   // which neighbors the active player can reach right now
   const reachable = useMemo(() => {
     const s = new Set<number>();
-    if (!myTurn || !me || !me.alive || me.dimmed || !G.hasRolled || G.pendingEvent) return s;
+    if (!myTurn || !me || me.wisp || G.autoWisp || !G.hasRolled || G.acted) return s;
     const cur = G.nodes[me.nodeId];
     for (const n of cur.neighbors) {
-      const cost = isCorruptedEdge(G, me.nodeId, n) ? 2 : 1;
-      if (G.stride >= cost) s.add(n);
+      if (G.stride >= strideCostFor(G, me.nodeId, n)) s.add(n);
     }
     return s;
   }, [myTurn, me, G]);
@@ -129,9 +126,9 @@ export function GloamingBoard(props: BoardProps<GState>) {
       <TopBar />
 
       <div className="flex min-h-0 flex-1 gap-3 px-3 pb-2">
-        {/* Dread tide */}
+        {/* Night tide */}
         <div className="w-14 py-2">
-          <DreadTide dread={G.dread} dreadMax={G.dreadMax} />
+          <NightTide night={G.night} nightMax={G.nightMax} act={G.act} />
         </div>
 
         {/* Board */}
@@ -140,7 +137,7 @@ export function GloamingBoard(props: BoardProps<GState>) {
             <svg
               viewBox={`0 0 ${BOARD_W} ${BOARD_H}`}
               className="h-full w-full"
-              style={{ filter: dreadFilter(G.dread, G.dreadMax), transition: 'filter 900ms ease' }}
+              style={{ filter: nightFilter(G.night, G.nightMax), transition: 'filter 900ms ease' }}
             >
               <defs>
                 <radialGradient id="vign" cx="50%" cy="42%" r="75%">
@@ -192,34 +189,32 @@ export function GloamingBoard(props: BoardProps<GState>) {
               </defs>
 
               {/* the world the board sits in */}
-              <Atmosphere ratio={dreadRatio} reduce={reduce} />
+              <Atmosphere ratio={nightRatio} reduce={reduce} />
 
-              {/* lantern-light each alive bearer casts on the dark */}
-              {Object.values(G.players)
-                .filter((p) => p.alive)
-                .map((p) => {
-                  const node = G.nodes[p.nodeId];
-                  return (
-                    <circle
-                      key={`ll-${p.id}`}
-                      cx={node.x}
-                      cy={node.y}
-                      r={p.dimmed ? 18 : 42}
-                      fill={SEAT_COLORS[p.seat]}
-                      opacity={p.dimmed ? 0.05 : 0.1}
-                      style={{ filter: 'url(#soft)', transition: 'r 600ms ease, opacity 600ms ease' }}
-                    />
-                  );
-                })}
+              {/* lantern-light each bearer casts on the dark (a Wisp's gutters low) */}
+              {Object.values(G.players).map((p) => {
+                const node = G.nodes[p.nodeId];
+                return (
+                  <circle
+                    key={`ll-${p.id}`}
+                    cx={node.x}
+                    cy={node.y}
+                    r={p.wisp ? 14 : 42}
+                    fill={SEAT_COLORS[p.seat]}
+                    opacity={p.wisp ? 0.04 : 0.1}
+                    style={{ filter: 'url(#soft)', transition: 'r 600ms ease, opacity 600ms ease' }}
+                  />
+                );
+              })}
 
               {/* edges — hand-walked curves, not plotted lines */}
               {EDGES.map(([a, b]) => {
                 const na = G.nodes[a];
                 const nb = G.nodes[b];
-                const corrupt = isCorruptedEdge(G, a, b);
+                const sealed = isSealed(G, a, b);
                 const lit = !!me && ((me.nodeId === a && reachable.has(b)) || (me.nodeId === b && reachable.has(a)));
                 const d = edgePath(na.x, na.y, nb.x, nb.y, a * 17 + b);
-                if (corrupt) {
+                if (sealed) {
                   return (
                     <g key={`${a}-${b}`}>
                       <path d={d} fill="none" stroke="var(--color-dread-deep)" strokeWidth={7} strokeOpacity={0.35} strokeLinecap="round" />
@@ -279,8 +274,7 @@ export function GloamingBoard(props: BoardProps<GState>) {
                     color={SEAT_COLORS[p.seat]}
                     name={p.name}
                     showName={group.length <= 2 || p.id === ctx.currentPlayer}
-                    dimmed={p.dimmed}
-                    alive={p.alive}
+                    wisp={p.wisp}
                     isCurrent={p.id === ctx.currentPlayer}
                   />
                 );
@@ -308,7 +302,7 @@ export function GloamingBoard(props: BoardProps<GState>) {
               className="absolute inset-0"
               style={{
                 background: 'radial-gradient(125% 95% at 50% 38%, transparent 32%, var(--color-void) 100%)',
-                opacity: 0.16 + dreadRatio * 0.55,
+                opacity: 0.16 + nightRatio * 0.55,
                 transition: 'opacity 900ms ease',
               }}
             />
@@ -317,13 +311,13 @@ export function GloamingBoard(props: BoardProps<GState>) {
               style={{ boxShadow: 'inset 0 0 170px 36px var(--color-dread-deep)' }}
               animate={
                 reduce
-                  ? { opacity: dreadRatio * 0.4 }
-                  : { opacity: [dreadRatio * 0.16, dreadRatio * 0.52, dreadRatio * 0.16] }
+                  ? { opacity: nightRatio * 0.4 }
+                  : { opacity: [nightRatio * 0.16, nightRatio * 0.52, nightRatio * 0.16] }
               }
               transition={
                 reduce
                   ? undefined
-                  : { duration: Math.max(0.62, 2.3 - dreadRatio * 1.5), repeat: Infinity, ease: 'easeInOut' }
+                  : { duration: Math.max(0.62, 2.3 - nightRatio * 1.5), repeat: Infinity, ease: 'easeInOut' }
               }
             />
           </div>
@@ -337,25 +331,6 @@ export function GloamingBoard(props: BoardProps<GState>) {
 
       {/* HUD */}
       <TurnHud props={props} myTurn={myTurn} />
-
-      {/* Narrator omen */}
-      <AnimatePresence>
-        {G.pendingEvent && myTurn && (
-          <NarratorPanel
-            cardId={G.pendingEvent.cardId}
-            onChoose={(i) => moves.resolveOmen(i)}
-            ai={shell.aiNarrator}
-            context={{
-              playerName: G.players[ctx.currentPlayer]?.name ?? 'the bearer',
-              dread: G.dread,
-              dreadMax: G.dreadMax,
-              beaconsLit: G.beaconsLit,
-              stalker: !!G.stalker,
-              recentLog: G.log.slice(-4).map((l) => l.text),
-            }}
-          />
-        )}
-      </AnimatePresence>
 
       {/* Hotseat handoff */}
       <AnimatePresence>
@@ -503,22 +478,34 @@ function NodeView({
       {/* drawn sigils — not Unicode glyphs */}
       <Sigil node={node} sealed={sealed} />
 
-      {/* beacon ember pips */}
+      {/* beacon kindling progress — a ring that fills as ember is poured in */}
+      {beacon && !beacon.lit && beacon.progress > 0 && (
+        <circle
+          cx={node.x}
+          cy={node.y}
+          r={radius + 5}
+          fill="none"
+          stroke="var(--color-ember)"
+          strokeWidth={3.5}
+          strokeLinecap="round"
+          strokeDasharray={`${Math.min(1, beacon.progress / G.beaconNeed) * 2 * Math.PI * (radius + 5)} ${2 * Math.PI * (radius + 5)}`}
+          transform={`rotate(-90 ${node.x} ${node.y})`}
+          style={{ filter: 'drop-shadow(0 0 4px var(--color-ember))', transition: 'stroke-dasharray 500ms ease' }}
+        />
+      )}
       {beacon && !beacon.lit && (
-        <g>
-          {Array.from({ length: EMBERS_PER_BEACON }, (_, i) => (
-            <circle
-              key={i}
-              cx={node.x - ((EMBERS_PER_BEACON - 1) * 11) / 2 + i * 11}
-              cy={node.y + 11}
-              r={3.5}
-              fill={i < beacon.embers ? 'var(--color-ember)' : 'var(--color-node-hollow-core)'}
-              stroke="var(--color-ember-deep)"
-              strokeWidth={0.75}
-              style={i < beacon.embers ? { filter: 'drop-shadow(0 0 4px var(--color-ember))' } : undefined}
-            />
-          ))}
-        </g>
+        <text
+          x={node.x}
+          y={node.y + 4}
+          textAnchor="middle"
+          className="font-display"
+          fontSize={12}
+          fill="var(--color-ember)"
+          opacity={0.92}
+          style={{ pointerEvents: 'none' }}
+        >
+          {beacon.progress}/{G.beaconNeed}
+        </text>
       )}
       {beacon?.lit && <BeaconFlame x={node.x} y={node.y} />}
 
@@ -636,8 +623,7 @@ function PlayerTokenView({
   color,
   name,
   showName,
-  dimmed,
-  alive,
+  wisp,
   isCurrent,
 }: {
   x: number;
@@ -645,8 +631,7 @@ function PlayerTokenView({
   color: string;
   name: string;
   showName: boolean;
-  dimmed: boolean;
-  alive: boolean;
+  wisp: boolean;
   isCurrent: boolean;
 }) {
   return (
@@ -655,38 +640,43 @@ function PlayerTokenView({
       animate={{ x, y }}
       transition={{ type: 'spring', stiffness: 200, damping: 24 }}
     >
-      {isCurrent && alive && (
+      {isCurrent && (
         <motion.circle
           r={15}
           fill="none"
-          stroke={color}
+          stroke={wisp ? 'var(--color-fog)' : color}
           strokeWidth={2}
           animate={{ opacity: [0.3, 0.9, 0.3], scale: [1, 1.25, 1] }}
           transition={{ duration: 1.8, repeat: Infinity }}
         />
       )}
-      <circle
-        r={10}
-        fill={alive ? color : 'var(--color-token-dead)'}
-        stroke="var(--color-void)"
-        strokeWidth={2}
-        opacity={dimmed ? 0.4 : 1}
-        style={{ filter: alive && !dimmed ? 'drop-shadow(0 2px 2px rgba(0,0,0,0.55))' : undefined }}
-      />
-      {/* glossy bead highlight */}
-      {alive && !dimmed && <circle cx={-3} cy={-3.5} r={3} fill="var(--color-parchment)" opacity={0.4} />}
-      {/* the lantern they carry */}
-      {alive && !dimmed && (
-        <circle cx={8} cy={6} r={2.6} fill="var(--color-ember-bright)" style={{ filter: 'drop-shadow(0 0 5px var(--color-ember))' }} />
-      )}
-      {!alive && (
-        <g stroke="var(--color-fog)" strokeWidth={1.6} strokeLinecap="round">
-          <line x1={-4} y1={-4} x2={4} y2={4} />
-          <line x1={4} y1={-4} x2={-4} y2={4} />
-        </g>
+      {wisp ? (
+        // a Wisp — a guttering, drifting mote, not a solid pawn
+        <motion.g
+          animate={{ y: [0, -3, 0], opacity: [0.55, 0.85, 0.55] }}
+          transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+        >
+          <circle r={7} fill={color} opacity={0.28} style={{ filter: 'url(#soft)' }} />
+          <circle r={3.4} fill="var(--color-parchment)" opacity={0.7} />
+          <circle r={1.6} fill="var(--color-ember-bright)" style={{ filter: 'drop-shadow(0 0 4px var(--color-ember))' }} />
+        </motion.g>
+      ) : (
+        <>
+          <circle
+            r={10}
+            fill={color}
+            stroke="var(--color-void)"
+            strokeWidth={2}
+            style={{ filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.55))' }}
+          />
+          {/* glossy bead highlight */}
+          <circle cx={-3} cy={-3.5} r={3} fill="var(--color-parchment)" opacity={0.4} />
+          {/* the lantern they carry */}
+          <circle cx={8} cy={6} r={2.6} fill="var(--color-ember-bright)" style={{ filter: 'drop-shadow(0 0 5px var(--color-ember))' }} />
+        </>
       )}
       {showName && (
-        <text textAnchor="middle" y={-15} fontSize={11} className="font-display" fill={alive ? color : 'var(--color-fog-dim)'}>
+        <text textAnchor="middle" y={-15} fontSize={11} className="font-display" fill={wisp ? 'var(--color-fog-dim)' : color}>
           {name}
         </text>
       )}

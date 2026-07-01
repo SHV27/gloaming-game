@@ -1,4 +1,4 @@
-import type { EventCard } from './types';
+import type { OmenCard } from './types';
 
 /**
  * Client side of the Living Narrator. Asks /api/narrate to RE-SKIN a drawn card's
@@ -42,24 +42,22 @@ export function resetNarrator(): void {
   disabled = false;
 }
 
-function buildPrompt(card: EventCard, ctx: NarrationContext): string {
-  const dreadPct = Math.round((ctx.dread / ctx.dreadMax) * 100);
+function buildPrompt(card: OmenCard, ctx: NarrationContext): string {
+  const nightPct = Math.round((ctx.dread / ctx.dreadMax) * 100);
   const story = ctx.recentLog.length ? ctx.recentLog.map((l) => `- ${l}`).join('\n') : '- (the journey has just begun)';
-  const choices = card.choices.map((c, i) => `  ${i + 1}. ${c.label} → ${c.outcome}`).join('\n');
   return `MOMENT
 - Active bearer: ${ctx.playerName}
-- Dread (night): ${dreadPct}% toward nightfall
+- Night: ${nightPct}% toward nightfall
 - Beacons lit: ${ctx.beaconsLit}/3
 - The Stalker is ${ctx.stalker ? 'awake and hunting' : 'not yet abroad'}
 
 RECENT STORY (for callbacks):
 ${story}
 
-CARD TO RE-SKIN (keep ${card.choices.length} choice${card.choices.length > 1 ? 's' : ''}, same meaning):
+OMEN TO RE-SKIN (keep exactly 1 "brave" choice, same meaning and cost direction):
 - Title: ${card.title}
-- Narration: ${card.narrator}
-- Choices:
-${choices}
+- Narration: ${card.narration}
+- Brave choice: ${card.brave.label} → ${card.brave.outcome}
 
 Re-skin it for this moment.`;
 }
@@ -90,7 +88,7 @@ async function callOnce(systemInstruction: string, userPrompt: string): Promise<
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export async function narrate(card: EventCard, ctx: NarrationContext): Promise<Reskin | null> {
+export async function narrate(card: OmenCard, ctx: NarrationContext): Promise<Reskin | null> {
   if (disabled) return null;
 
   const bucket = Math.round((ctx.dread / Math.max(1, ctx.dreadMax)) * 4);
@@ -105,7 +103,7 @@ export async function narrate(card: EventCard, ctx: NarrationContext): Promise<R
     result = await callOnce(SYSTEM, userPrompt);
   }
 
-  if (!result || result.source !== 'gemini' || !valid(result.beat, card.choices.length)) {
+  if (!result || result.source !== 'gemini' || !valid(result.beat, 1)) {
     consecutiveFails++;
     // No key / offline / persistent errors → stop trying this session.
     if (consecutiveFails >= 3 || result?.reason === 'no_key') disabled = true;

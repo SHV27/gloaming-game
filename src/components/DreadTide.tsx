@@ -1,29 +1,39 @@
 import { motion } from 'framer-motion';
-import { DREAD_STRIKE_RATIOS } from '../game/constants';
+import type { Act } from '../game/types';
+import { ACT_RATIOS, ACT_NAMES } from '../game/constants';
 
 /**
- * The Dread tide — our visible tension clock (CLAUDE §6 "make time visible").
- * A vertical column of black water that rises toward NIGHT; threshold marks show
- * where the Gloaming starts striking harder.
+ * The Night tide — our visible tension clock (CLAUDE §6 "make time visible").
+ * A vertical column of black water that rises toward nightfall; the tick marks
+ * are the Act boundaries (Dusk → Gloaming → Pitch), where the Gloaming gains a
+ * new power and the tide quickens.
  */
-export function DreadTide({ dread, dreadMax }: { dread: number; dreadMax: number }) {
-  const r = Math.min(1, dread / dreadMax);
+export function NightTide({
+  night,
+  nightMax,
+  act,
+}: {
+  night: number;
+  nightMax: number;
+  act: Act;
+}) {
+  const r = Math.min(1, night / nightMax);
   const near = r >= 0.66;
 
   return (
     <div className="flex h-full select-none flex-col items-center gap-2">
-      <div className="font-display text-[10px] uppercase tracking-[0.3em] text-dread-bright/80">
+      <div className="font-display text-[10px] uppercase tracking-[0.28em] text-dread-bright/80">
         Night
       </div>
 
       <div className="relative w-9 flex-1 overflow-hidden rounded-full border border-haze/40 bg-night/80">
-        {/* threshold ticks */}
-        {DREAD_STRIKE_RATIOS.map((ratio) => (
+        {/* Act boundaries */}
+        {ACT_RATIOS.map((ratio, i) => (
           <div
             key={ratio}
             className="absolute left-0 right-0 z-20 h-px bg-dread/50"
             style={{ bottom: `${ratio * 100}%` }}
-            title={`The dark strikes harder past ${Math.round(ratio * dreadMax)}`}
+            title={`${ACT_NAMES[i + 1]} begins`}
           />
         ))}
 
@@ -38,7 +48,6 @@ export function DreadTide({ dread, dreadMax }: { dread: number; dreadMax: number
             boxShadow: '0 0 22px -2px var(--color-dread)',
           }}
         >
-          {/* restless wave surface */}
           <motion.svg
             className="absolute inset-x-0 top-0 h-3 w-full overflow-visible"
             viewBox="0 0 48 8"
@@ -58,20 +67,20 @@ export function DreadTide({ dread, dreadMax }: { dread: number; dreadMax: number
 
       <div className="text-center">
         <div
-          className={`font-display text-lg leading-none ${near ? 'text-dread-bright text-glow-dread' : 'text-fog'}`}
+          className={`font-display text-[10px] uppercase leading-none tracking-wider ${near ? 'text-dread-bright text-glow-dread' : 'text-fog'}`}
         >
-          {dread}
+          {ACT_NAMES[act]}
         </div>
-        <div className="text-[9px] uppercase tracking-widest text-fog-dim">/ {dreadMax}</div>
+        <div className="mt-0.5 text-[9px] uppercase tracking-widest text-fog-dim">
+          {night}/{nightMax}
+        </div>
       </div>
     </div>
   );
 }
 
-/** Filter applied to the board so the world literally desaturates as Dread climbs. */
-export function dreadFilter(dread: number, dreadMax: number): string {
-  const r = Math.min(1, dread / dreadMax);
-  // strong desaturation (colour drains from the world); the Dread veil handles
-  // the darkening, so keep brightness loss gentle here to avoid doubling up.
+/** Filter applied to the board so the world literally desaturates as Night climbs. */
+export function nightFilter(night: number, nightMax: number): string {
+  const r = Math.min(1, night / nightMax);
   return `saturate(${(1 - r * 0.78).toFixed(3)}) brightness(${(1 - r * 0.16).toFixed(3)})`;
 }

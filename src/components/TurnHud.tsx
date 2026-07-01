@@ -1,48 +1,53 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import type { BoardProps } from 'boardgame.io/react';
-import type { GState } from '../game/types';
+import type { GState, Player } from '../game/types';
 import { Dice } from './Dice';
 import { Button } from '../ui/Button';
-import { ITEMS } from '../game/events';
-import { strikeCount } from '../game/effects';
-import {
-  AP_BASE,
-  PRESS_ON_MAX,
-  BASE_STRIKES,
-  LIGHT_MAX,
-  EMBERS_PER_BEACON,
-  GATHER_AMOUNT,
-  STEADY_LIGHT,
-  SEAT_COLORS,
-} from '../game/constants';
+import { getReaction } from '../game/effects';
+import { SEAT_COLORS, EMBER_MAX, REKINDLE_COST } from '../game/constants';
+
+const INTENT_ICON: Record<string, string> = {
+  snuff: 'M4 12 Q8 4 12 12 M8 12 v-5', // a guttering flame
+  seal: 'M3 8 h10 M5 5 l-2 3 2 3 M11 5 l2 3 -2 3', // a barred road
+  stalk: 'M8 3 v10 M4 7 l4 -3 4 3', // an approaching eye/spike
+  surge: 'M2 10 q3 -5 6 0 t6 0', // a rising wave
+};
 
 export function TurnHud({ props, myTurn }: { props: BoardProps<GState>; myTurn: boolean }) {
   const { G, ctx, moves } = props;
-  const [accusing, setAccusing] = useState(false);
   const me = G.players[ctx.currentPlayer];
+  const [accusing, setAccusing] = useState(false);
+
+  // A Wisp's turn auto-resolves — drift already happened in onBegin; just pass.
+  const autoPassed = useRef(-1);
+  useEffect(() => {
+    if (!myTurn || !G.autoWisp || ctx.gameover) return;
+    if (autoPassed.current === ctx.turn) return;
+    autoPassed.current = ctx.turn;
+    const id = setTimeout(() => moves.endTurn(), 1500);
+    return () => clearTimeout(id);
+  }, [myTurn, G.autoWisp, ctx.turn, ctx.gameover, moves]);
+
   if (!me) return null;
 
-  const node = G.nodes[me.nodeId];
-  const budget = AP_BASE + G.pressOns;
-  const actionsLeft = budget - G.actionsTaken;
-  const canAct = myTurn && me.alive && !me.dimmed && !G.pendingEvent && actionsLeft > 0;
-  const moveLocked = !myTurn || me.dimmed || !me.alive || !!G.pendingEvent;
-
-  const beacon = node.type === 'beacon' ? G.beacons.find((b) => b.nodeId === node.id) : undefined;
-  const onUnlitBeacon = beacon && !beacon.lit;
-  const allies = Object.values(G.players).filter(
-    (p) => p.id !== me.id && p.alive && p.nodeId === me.nodeId,
+  const canChoose = myTurn && !me.wisp && !G.autoWisp && G.hasRolled && !G.acted;
+  const reaction = getReaction(G, me);
+  const wispAlliesHere = Object.values(G.players).filter(
+    (p) => p.wisp && p.id !== me.id && p.nodeId === me.nodeId,
   );
+  const canRekindleHere = wispAlliesHere.length > 0 && me.ember >= REKINDLE_COST + 1;
 
-  // What the board will do the instant this turn ends — the felt threat.
-  const incomingStrikes = strikeCount(G, BASE_STRIKES);
-  // Press-On delve success chance: roll a d6 ≥ (3 + current pressOns).
-  const pressOdds = Math.max(0, Math.round(((4 - G.pressOns) / 6) * 100));
+  const beaconsLeft = 3 - G.beaconsLit;
+  const goal =
+    beaconsLeft > 0
+      ? `Light ${beaconsLeft} more Beacon${beaconsLeft === 1 ? '' : 's'}, then gather every bearer at the Threshold.`
+      : 'The gate is open — bring every bearer to the Threshold to cross!';
 
   return (
     <div className="border-t border-haze/30 bg-dusk/95 px-4 py-3 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-3">
-        {/* identity + vitals */}
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2">
+        {/* identity + Ember */}
         <div className="flex items-center gap-3">
           <span
             className="grid h-9 w-9 place-items-center rounded-full border-2 font-display text-sm"
@@ -53,255 +58,265 @@ export function TurnHud({ props, myTurn }: { props: BoardProps<GState>; myTurn: 
           <div>
             <div className="font-display text-sm tracking-wide" style={{ color: SEAT_COLORS[me.seat] }}>
               {me.name}
-              {me.dimmed && <span className="ml-2 text-xs text-dread-bright">· dimmed</span>}
-              {!me.alive && <span className="ml-2 text-xs text-fog-dim">· lost</span>}
+              {me.wisp && <span className="ml-2 text-xs text-dread-bright">· a Wisp</span>}
             </div>
-            <Vitals light={me.light} embers={me.embers} />
+            <EmberBar ember={me.ember} wisp={me.wisp} />
           </div>
         </div>
 
-        {/* beacons + status */}
-        <div className="flex items-center gap-4 text-xs text-fog">
-          <Tally label="Beacons" value={`${G.beaconsLit}/3`} hot={G.beaconsLit === 3} />
-          {G.hasRolled && (
-            <Tally label="Stride" value={String(G.stride)} hot={G.stride > 0 && !moveLocked} />
-          )}
-          <Tally label="Actions" value={`${Math.max(0, actionsLeft)}`} hot={canAct} />
+        {/* goal — always visible (clarity: "your goal right now") */}
+        <div className="min-w-0 flex-1">
+          <div className="font-display text-[10px] uppercase tracking-[0.3em] text-ember/60">Your goal</div>
+          <div className="truncate font-body text-[13px] text-parchment/90">{goal}</div>
         </div>
 
-        <div className="flex-1" />
+        {/* the Gloaming's telegraphed intent — you see it coming */}
+        <IntentReadout G={G} />
 
-        {/* dice */}
+        {/* dice + roll */}
         <div className="flex items-center gap-3">
           <Dice value={G.lastRoll} />
-          {myTurn && me.alive && !me.dimmed && !G.hasRolled && !G.pendingEvent && (
+          {myTurn && !me.wisp && !G.autoWisp && !G.hasRolled && (
             <Button variant="primary" onClick={() => moves.rollStride()}>
               Roll Stride
             </Button>
-          )}
-          {G.hasRolled && !moveLocked && G.stride > 0 && (
-            <span className="max-w-[9rem] font-body text-xs italic text-ember/80">
-              step to a glowing path…
-            </span>
           )}
         </div>
       </div>
 
       {/* action row */}
-      <div className="mx-auto mt-3 flex max-w-6xl flex-wrap items-center gap-2">
+      <div className="mx-auto mt-3 max-w-6xl">
         {!myTurn && <span className="font-body text-sm italic text-fog-dim">Not your turn.</span>}
 
-        {myTurn && !me.alive && (
-          <span className="font-body text-sm italic text-fog-dim">
-            This bearer is lost to the dark.
+        {myTurn && (me.wisp || G.autoWisp) && (
+          <motion.span
+            className="font-body text-sm italic text-dread-bright/90"
+            animate={{ opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 1.6, repeat: Infinity }}
+          >
+            {me.name} is a Wisp — drifting toward the Hearth. An ally must reach you to Rekindle your light…
+          </motion.span>
+        )}
+
+        {myTurn && !me.wisp && !G.autoWisp && !G.hasRolled && (
+          <span className="font-body text-sm italic text-ember/80">
+            Roll the Stride die to begin your turn.
           </span>
         )}
 
-        {myTurn && me.dimmed && me.alive && (
-          <span className="font-body text-sm italic text-dread-bright/90">
-            Your lantern is out. End your turn — an ally must reach you to lift you back.
-          </span>
-        )}
-
-        {myTurn && me.alive && !me.dimmed && (
-          <>
-            {node.type === 'wellspring' && (
-              <>
-                <Button variant="ghost" disabled={!canAct} onClick={() => moves.gather('embers')}>
-                  Draw +{GATHER_AMOUNT} Embers
-                </Button>
-                <Button variant="ghost" disabled={!canAct} onClick={() => moves.gather('light')}>
-                  Draw +{GATHER_AMOUNT} Warmth
-                </Button>
-              </>
-            )}
-
-            {onUnlitBeacon && (
-              <Button
-                variant="beacon"
-                disabled={!canAct || me.embers <= 0}
-                onClick={() => moves.kindle(Math.min(me.embers, EMBERS_PER_BEACON - beacon!.embers))}
-              >
-                Kindle Beacon ({Math.min(me.embers, EMBERS_PER_BEACON - beacon!.embers)})
-              </Button>
-            )}
-
-            {node.type === 'shrine' && (
-              <Button variant="ghost" disabled={!canAct} onClick={() => moves.commune()}>
-                Commune
-              </Button>
-            )}
-
-            <Button variant="ghost" disabled={!canAct} onClick={() => moves.steady()}>
-              Steady (+{STEADY_LIGHT} Warmth)
-            </Button>
-
-            {/* aid co-located allies */}
-            {allies.map((a) => (
-              <span key={a.id} className="flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-1">
-                <span className="font-display text-xs" style={{ color: SEAT_COLORS[a.seat] }}>
-                  {a.name}:
-                </span>
-                <MiniBtn disabled={me.embers <= 0 || !myTurn} onClick={() => moves.aid(a.id, 'embers', 1)}>
-                  +ember
-                </MiniBtn>
-                <MiniBtn disabled={me.light <= 1 || !myTurn} onClick={() => moves.aid(a.id, 'light', 1)}>
-                  +warmth
-                </MiniBtn>
-                {a.dimmed && (
-                  <MiniBtn disabled={!canAct || me.light <= 1} onClick={() => moves.aid(a.id, 'revive', 0)}>
-                    revive
-                  </MiniBtn>
-                )}
+        {canChoose && (
+          <div className="flex flex-col gap-3">
+            {/* move hint */}
+            {G.stride > 0 && (
+              <span className="font-body text-xs italic text-ember/70">
+                Stride {G.stride} — step to a glowing path, or act where you stand.
               </span>
-            ))}
+            )}
 
-            {/* items */}
-            {me.items.map((it, i) => (
-              <Button
-                key={`${it}-${i}`}
-                variant="ghost"
-                title={ITEMS[it].blurb}
-                onClick={() => moves.useItem(it)}
+            {/* the place reacts + Brave / Steady */}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={`${me.nodeId}-${reaction.title}`}
+                initial={{ opacity: 0, y: 8, filter: 'blur(4px)' }}
+                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                transition={{ duration: 0.35 }}
+                className="flex flex-col gap-2 md:flex-row md:items-stretch"
               >
-                Use {ITEMS[it].name}
-              </Button>
+                {/* narration */}
+                <div className="min-w-0 flex-1 rounded-lg border border-white/10 bg-night/50 px-4 py-2.5">
+                  <div className="font-display text-sm text-parchment text-engraved">{reaction.title}</div>
+                  <div className="mt-0.5 font-body text-[13px] leading-snug text-parchment/75">
+                    {reaction.narration}
+                  </div>
+                </div>
+
+                {/* choices */}
+                <div className="flex shrink-0 gap-2">
+                  <ChoiceButton
+                    label={reaction.brave.label}
+                    preview={reaction.brave.preview}
+                    reason={reaction.brave.reason}
+                    enabled={reaction.brave.enabled}
+                    tone="brave"
+                    onClick={() => moves.brave()}
+                  />
+                  <ChoiceButton
+                    label={reaction.steady.label}
+                    preview={reaction.steady.preview}
+                    enabled
+                    tone="steady"
+                    onClick={() => moves.steady()}
+                  />
+                </div>
+              </motion.div>
+            </AnimatePresence>
+
+            {/* fellowship: rekindle a fallen ally on your node */}
+            {wispAlliesHere.map((a) => (
+              <ChoiceButton
+                key={a.id}
+                label={`Rekindle ${a.name} (−${REKINDLE_COST} Ember)`}
+                preview={canRekindleHere ? `Lift ${a.name} back into the light` : undefined}
+                reason={canRekindleHere ? undefined : 'Not enough Ember to spare'}
+                enabled={canRekindleHere}
+                tone="fellow"
+                onClick={() => moves.rekindle(a.id)}
+              />
             ))}
 
-            {/* the Marked's covert sabotage (only the Marked sees this) */}
-            {me.role === 'marked' && (
+            {/* the Marked's covert sabotage (only the Marked ever sees this) */}
+            {me.role === 'marked' && !G.markedExposed && (
               <button
                 type="button"
-                disabled={G.sowedThisTurn || me.light <= 1 || !!G.pendingEvent}
+                disabled={G.sowedThisTurn || me.ember <= 2}
                 onClick={() => moves.sow()}
-                title="Quietly feed the dark: +1 Dread, but it costs you 1 Light. Once per turn. No one will know it was you."
-                className="flex items-center gap-2 rounded-md border border-dread/50 bg-dread/10 px-4 py-2 font-display text-sm uppercase tracking-wide text-dread-bright hover:bg-dread/20 disabled:opacity-30"
+                title="Quietly feed the dark: +1 Night, but it costs you 1 Ember. Once per turn. No one will know it was you."
+                className="self-start rounded-md border border-dread/50 bg-dread/10 px-4 py-1.5 font-display text-xs uppercase tracking-wide text-dread-bright hover:bg-dread/20 disabled:opacity-30"
               >
-                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                  <path d="M8 2 V14 M3 6 H13 M4.5 11 L11.5 11" />
-                </svg>
                 Sow the Dark
               </button>
             )}
 
             {/* the party's one accusation */}
-            {G.hasMarked && !G.castOutUsed &&
-              (accusing ? (
-                <span className="flex items-center gap-1 rounded-md border border-dread/40 bg-dread/5 px-2 py-1">
-                  <span className="font-display text-[11px] uppercase tracking-wide text-dread-bright/80">Cast out:</span>
-                  {Object.values(G.players)
-                    .filter((p) => p.id !== me.id && p.alive)
-                    .map((p) => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => {
-                          moves.castOut(p.id);
-                          setAccusing(false);
-                        }}
-                        className="rounded border border-white/10 px-1.5 py-0.5 font-display text-[11px] hover:bg-white/10"
-                        style={{ color: SEAT_COLORS[p.seat] }}
-                      >
-                        {p.name}
-                      </button>
-                    ))}
-                  <button type="button" onClick={() => setAccusing(false)} className="px-1 text-[11px] text-fog-dim hover:text-parchment">
-                    ✕
-                  </button>
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  disabled={!!G.pendingEvent}
-                  onClick={() => setAccusing(true)}
-                  title="Accuse one bearer of being Marked. Right: the dark recoils (−4 Dread, their Sow is stilled). Wrong: the party fractures (+4 Dread). One accusation per game."
-                  className="rounded-md border border-haze/50 bg-white/5 px-4 py-2 font-display text-sm uppercase tracking-wide text-parchment hover:bg-white/10 disabled:opacity-30"
-                >
-                  Cast Out…
-                </button>
-              ))}
-
-            <div className="flex-1" />
-
-            <span
-              className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 font-display text-xs uppercase tracking-wider ${
-                incomingStrikes >= 3
-                  ? 'border-dread/50 bg-dread/15 text-dread-bright text-glow-dread'
-                  : 'border-haze/40 bg-night/40 text-fog'
-              }`}
-              title="What the Gloaming will do the moment you end your turn."
-            >
-              Gloaming strikes
-              <span className="font-display text-base leading-none">×{incomingStrikes}</span>
-            </span>
-
-            <Button
-              variant="danger"
-              disabled={G.pressOns >= PRESS_ON_MAX || !!G.pendingEvent}
-              title={`Delve for an extra action: roll ≥${3 + G.pressOns} to gain a boon (${pressOdds}% chance); fail and the dark takes ${G.pressOns + 1} Light + Dread. Also +1 Gloaming strike this turn.`}
-              onClick={() => moves.pressOn()}
-            >
-              Press On · {pressOdds}%
-            </Button>
-            <Button variant="primary" disabled={!!G.pendingEvent} onClick={() => moves.endTurn()}>
-              End Turn
-            </Button>
-          </>
+            {G.hasMarked && !G.castOutUsed && (
+              <CastOut
+                players={Object.values(G.players).filter((p) => p.id !== me.id)}
+                accusing={accusing}
+                setAccusing={setAccusing}
+                onCast={(id) => {
+                  moves.castOut(id);
+                  setAccusing(false);
+                }}
+              />
+            )}
+          </div>
         )}
       </div>
     </div>
   );
 }
 
-function Vitals({ light, embers }: { light: number; embers: number }) {
+// ── ember readout ────────────────────────────────────────────────────────────
+function EmberBar({ ember, wisp }: { ember: number; wisp: boolean }) {
   return (
-    <div className="mt-0.5 flex items-center gap-3">
-      <div className="flex items-center gap-1" title={`Light ${light}/${LIGHT_MAX}`}>
-        {Array.from({ length: LIGHT_MAX }, (_, i) => (
-          <span
-            key={i}
-            className="h-2.5 w-2.5 rounded-full"
-            style={{
-              background: i < light ? 'var(--color-ember-bright)' : 'transparent',
-              border: '1px solid var(--color-ember-deep)',
-              boxShadow: i < light ? '0 0 6px var(--color-ember)' : 'none',
-            }}
-          />
-        ))}
+    <div className="mt-0.5 flex items-center gap-2" title={`Ember ${ember}/${EMBER_MAX}`}>
+      <span className={`font-display text-sm ${wisp ? 'text-fog-dim' : 'text-ember-bright'}`}>✦ {ember}</span>
+      <div className="h-1.5 w-24 overflow-hidden rounded-full bg-night">
+        <div
+          className="h-full rounded-full transition-all"
+          style={{
+            width: `${Math.min(100, (ember / EMBER_MAX) * 100)}%`,
+            background: wisp
+              ? 'var(--color-fog-dim)'
+              : 'linear-gradient(90deg, var(--color-ember-deep), var(--color-ember-bright))',
+            boxShadow: wisp ? undefined : '0 0 6px var(--color-ember)',
+          }}
+        />
       </div>
-      <span className="font-display text-xs text-ember">✦ {embers}</span>
     </div>
   );
 }
 
-function Tally({ label, value, hot }: { label: string; value: string; hot?: boolean }) {
-  return (
-    <div className="text-center">
-      <div className={`font-display text-base leading-none ${hot ? 'text-ember-bright text-glow-ember' : 'text-parchment'}`}>
-        {value}
+// ── the Gloaming's next move, telegraphed ────────────────────────────────────
+function IntentReadout({ G }: { G: GState }) {
+  if (!G.intents.length) {
+    return (
+      <div className="flex items-center gap-2 rounded-md border border-haze/40 bg-night/40 px-3 py-1.5">
+        <span className="font-body text-xs italic text-fog-dim">The Gloaming watches, and waits.</span>
       </div>
-      <div className="text-[9px] uppercase tracking-widest text-fog-dim">{label}</div>
+    );
+  }
+  return (
+    <div className="flex max-w-md flex-col gap-1">
+      <div className="font-display text-[10px] uppercase tracking-[0.3em] text-dread-bright/70">
+        The Gloaming intends…
+      </div>
+      {G.intents.map((it, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="var(--color-dread-bright)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+            <path d={INTENT_ICON[it.kind]} />
+          </svg>
+          <span className="font-body text-[12px] leading-tight text-dread-bright/90">{it.telegraph}</span>
+        </div>
+      ))}
     </div>
   );
 }
 
-function MiniBtn({
-  children,
+// ── a Brave / Steady / Rekindle choice ───────────────────────────────────────
+function ChoiceButton({
+  label,
+  preview,
+  reason,
+  enabled,
+  tone,
   onClick,
-  disabled,
 }: {
-  children: React.ReactNode;
+  label: string;
+  preview?: string;
+  reason?: string;
+  enabled: boolean;
+  tone: 'brave' | 'steady' | 'fellow';
   onClick: () => void;
-  disabled?: boolean;
 }) {
+  const variant = tone === 'brave' ? 'primary' : tone === 'fellow' ? 'beacon' : 'ghost';
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className="rounded border border-white/10 px-1.5 py-0.5 font-body text-[11px] text-fog hover:bg-white/10 hover:text-parchment disabled:opacity-30"
-    >
-      {children}
-    </button>
+    <div className="flex min-w-[8.5rem] flex-col">
+      <Button variant={variant} disabled={!enabled} onClick={onClick} className="w-full justify-center">
+        {label}
+      </Button>
+      <span
+        className={`mt-1 text-center font-body text-[11px] ${
+          reason ? 'text-dread-bright/80' : 'text-fog-dim'
+        }`}
+      >
+        {reason ?? preview ?? ' '}
+      </span>
+    </div>
+  );
+}
+
+// ── the accusation UI ────────────────────────────────────────────────────────
+function CastOut({
+  players,
+  accusing,
+  setAccusing,
+  onCast,
+}: {
+  players: Player[];
+  accusing: boolean;
+  setAccusing: (v: boolean) => void;
+  onCast: (id: string) => void;
+}) {
+  if (!accusing) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAccusing(true)}
+        title="Accuse one bearer of being Marked. Right: the dark recoils (−4 Night, their Sow is stilled). Wrong: the party fractures (+4 Night). One accusation per game."
+        className="self-start rounded-md border border-haze/50 bg-white/5 px-4 py-1.5 font-display text-xs uppercase tracking-wide text-parchment hover:bg-white/10"
+      >
+        Cast Out…
+      </button>
+    );
+  }
+  return (
+    <span className="flex items-center gap-1 self-start rounded-md border border-dread/40 bg-dread/5 px-2 py-1">
+      <span className="font-display text-[11px] uppercase tracking-wide text-dread-bright/80">Cast out:</span>
+      {players.map((p) => (
+        <button
+          key={p.id}
+          type="button"
+          onClick={() => onCast(p.id)}
+          className="rounded border border-white/10 px-1.5 py-0.5 font-display text-[11px] hover:bg-white/10"
+          style={{ color: SEAT_COLORS[p.seat] }}
+        >
+          {p.name}
+        </button>
+      ))}
+      <button type="button" onClick={() => setAccusing(false)} className="px-1 text-[11px] text-fog-dim hover:text-parchment">
+        ✕
+      </button>
+    </span>
   );
 }

@@ -1,55 +1,42 @@
 import type { Game } from 'boardgame.io';
 import { INVALID_MOVE } from 'boardgame.io/core';
-import type { GState, Player, ItemId, LogTone, EventType } from './types';
+import type { GState, Player, GloamingIntent } from './types';
 import { BOARD, HEARTH_ID, THRESHOLD_ID, BEACON_NODE_IDS } from './board';
-import { OMEN_DECK, eventById, ITEMS } from './events';
+import { OMEN_DECK } from './events';
 import {
-  AP_BASE,
-  PRESS_ON_MAX,
-  LIGHT_START,
   EMBER_START,
-  GATHER_AMOUNT,
-  STEADY_LIGHT,
-  REVIVE_LIGHT_COST,
-  REVIVE_TARGET_LIGHT,
-  CORRUPT_EDGE_COST,
-  EMBERS_PER_BEACON,
-  BASE_STRIKES,
-  DREAD_TIDE_RISE,
+  nightMaxFor,
+  beaconNeedFor,
+  actFor,
+  emberDrainFor,
+  intentCountFor,
+  NIGHT_TIDE,
+  ACT_NAMES,
+  REKINDLE_COST,
+  REKINDLE_TARGET_EMBER,
   SEAT_NAMES,
   MIN_MARKED_PLAYERS,
-  dreadMaxFor,
 } from './constants';
 import {
   log,
   flash,
-  applyEffect,
-  gainLight,
-  gainEmbers,
-  isCorrupted,
-  cleanseEdgeNear,
-  addBeaconEmber,
-  gloamingStrike,
-  stalkerPhase,
-  strikeCount,
-  recomputeBeaconsLit,
+  drainEmber,
+  gainEmber,
+  addNight,
+  strideCostFor,
+  executeIntent,
+  chooseIntent,
   checkGameover,
-  addDread,
-  drainLight,
+  applyBrave,
+  steadyEmberAt,
 } from './effects';
 
-/** Minimal shapes for the boardgame.io plugin APIs we use (kept local & honest). */
 interface RandomAPI {
   D6: () => number;
   Die: (spotvalue: number) => number;
   Number: () => number;
   Shuffle: <T>(deck: T[]) => T[];
 }
-
-const toneFor = (t: EventType): LogTone =>
-  t === 'gift' ? 'hope' : t === 'trap' || t === 'stalker' ? 'dread' : 'neutral';
-
-const ITEM_IDS: ItemId[] = ['ward', 'oil', 'mapfrag'];
 
 function drawOmen(G: GState, random: RandomAPI): number | null {
   if (G.deck.length === 0) {
@@ -60,7 +47,22 @@ function drawOmen(G: GState, random: RandomAPI): number | null {
   return G.deck.pop() ?? null;
 }
 
-const actionBudget = (G: GState) => AP_BASE + G.pressOns;
+/** Drift a Wisp one step toward the Hearth (the safe current). */
+function driftToward(G: GState, p: Player, hearthId: number): void {
+  if (p.nodeId === hearthId) return;
+  const h = G.nodes[hearthId];
+  let best = p.nodeId;
+  let bestD = Infinity;
+  for (const m of G.nodes[p.nodeId].neighbors) {
+    const nm = G.nodes[m];
+    const d = (nm.x - h.x) ** 2 + (nm.y - h.y) ** 2;
+    if (d < bestD) {
+      bestD = d;
+      best = m;
+    }
+  }
+  p.nodeId = best;
+}
 
 export interface GloamingConfig {
   names: string[]; // 2–6 names; length = numPlayers
@@ -76,10 +78,8 @@ export function makeGloaming(config: GloamingConfig): Game<GState> {
     setup: ({ random }): GState => {
       const nodes = BOARD.slice()
         .map((n) => ({ ...n, neighbors: [...n.neighbors] }))
-        .sort((a, b) => a.id - b.id); // index === id
+        .sort((a, b) => a.id - b.id);
 
-      // Secretly mark one bearer. setup runs only on the master, and playerView
-      // strips the result from every client, so this never leaks.
       let markedId: string | null = null;
       if (config.marked && names.length >= MIN_MARKED_PLAYERS) {
         markedId = String(random.Die(names.length) - 1);
@@ -92,60 +92,60 @@ export function makeGloaming(config: GloamingConfig): Game<GState> {
           name: nm || SEAT_NAMES[seat] || `Bearer ${seat + 1}`,
           seat,
           nodeId: HEARTH_ID,
-          light: LIGHT_START,
-          embers: EMBER_START,
-          items: [],
-          alive: true,
-          dimmed: false,
-          graced: false,
-          warded: false,
-          doubleDrain: false,
+          ember: EMBER_START,
+          wisp: false,
           role: String(seat) === markedId ? 'marked' : 'bearer',
         };
       });
 
       const ids = OMEN_DECK.map((c) => c.id);
       const deck = random && random.Shuffle ? random.Shuffle(ids) : ids.slice().reverse();
+      const nightMax = nightMaxFor(names.length);
 
       return {
         players,
         nodes,
-        corruptedEdges: [],
-        beacons: BEACON_NODE_IDS.map((nodeId) => ({ nodeId, embers: 0, lit: false })),
+        sealedEdges: [],
+        beacons: BEACON_NODE_IDS.map((nodeId) => ({ nodeId, progress: 0, lit: false })),
         beaconsLit: 0,
         thresholdId: THRESHOLD_ID,
-        dread: 0,
-        dreadMax: dreadMaxFor(names.length),
+        beaconNeed: beaconNeedFor(names.length),
+        night: 0,
+        nightMax,
+        act: 0,
         deck,
         discard: [],
-        pendingEvent: null,
+        turnOmen: null,
+        intents: [],
+        stalker: null,
+        snuffCd: 0,
         stride: 0,
         hasRolled: false,
-        actionsTaken: 0,
-        pressOns: 0,
+        movedThisTurn: false,
+        acted: false,
         boardActed: false,
         lastRoll: null,
+        autoWisp: false,
         log: [
           {
             id: 0,
             turn: 0,
-            tone: 'neutral' as LogTone,
-            text: 'The Gloaming deepens. Light the three Beacons and cross the Threshold — before night falls.',
+            tone: 'neutral',
+            text: 'Night is coming. Light the three Beacons, gather at the Threshold, and cross — before the dark drowns the world.',
           },
         ],
         logSeq: 1,
         flash: null,
         flashSeq: 1,
-        stalker: null,
-        sowedThisTurn: false,
         hasMarked: markedId !== null,
         castOutUsed: false,
         markedExposed: false,
+        sowedThisTurn: false,
         secret: { markedId },
       };
     },
 
-    // Secret State: each client receives only its OWN role; `secret` is wiped.
+    // Secret State: each client sees only its OWN role; `secret` is wiped.
     playerView: ({ G, playerID }) => ({
       ...G,
       players: Object.fromEntries(
@@ -158,78 +158,83 @@ export function makeGloaming(config: GloamingConfig): Game<GState> {
     }),
 
     turn: {
-      // The Gloaming plays back at the end of every turn (idempotent).
       onBegin: ({ G, ctx, random }) => {
         G.stride = 0;
         G.hasRolled = false;
-        G.actionsTaken = 0;
-        G.pressOns = 0;
+        G.movedThisTurn = false;
+        G.acted = false;
         G.boardActed = false;
         G.lastRoll = null;
-        G.pendingEvent = null;
+        G.autoWisp = false;
+        G.turnOmen = null;
         G.flash = null;
         G.sowedThisTurn = false;
 
         const p = G.players[ctx.currentPlayer];
-        if (!p || !p.alive) {
-          if (p) log(G, `${p.name}'s seat lies empty. The dark presses on.`, 'dread');
-          return;
-        }
-        if (p.dimmed) {
-          log(G, `${p.name} lies dimmed — they can only wait to be lifted.`, 'dread');
+        if (!p) return;
+
+        // The night gnaws at the active bearer's lantern (the heartbeat drain).
+        drainEmber(G, p, emberDrainFor(G.act));
+
+        if (p.wisp) {
+          // A Wisp's turn auto-resolves — it drifts and passes. Never a dead end.
+          G.autoWisp = true;
+          G.hasRolled = true;
+          G.acted = true;
+          driftToward(G, p, HEARTH_ID);
+          log(G, `${p.name} drifts on the cold current — a Wisp, seeking the Hearth's warmth.`, 'dread');
           return;
         }
 
-        const cardId = drawOmen(G, random as RandomAPI);
-        if (cardId === null) return;
-        const card = eventById(cardId);
-        if (card.auto) {
-          for (const e of card.choices[0].effects) applyEffect(G, p, e, random as RandomAPI);
-          log(G, `${card.title} — ${card.choices[0].outcome}`, toneFor(card.type));
-          G.discard.push(cardId);
-        } else {
-          G.pendingEvent = { cardId };
-          log(G, `An omen rises: ${card.title}.`, toneFor(card.type));
-        }
+        G.turnOmen = drawOmen(G, random as RandomAPI);
       },
 
       onEnd: ({ G, random }) => {
-        if (G.boardActed) return; // idempotency guard (RESEARCH §2)
+        if (G.boardActed) return; // idempotency guard
         G.boardActed = true;
 
-        addDreadTide(G);
-        const strikes = strikeCount(G, BASE_STRIKES);
-        for (let i = 0; i < strikes; i++) gloamingStrike(G, random as RandomAPI);
-        stalkerPhase(G, random as RandomAPI);
-        recomputeBeaconsLit(G);
-        flash(G, 'dread-strike');
+        // the turn's omen passes if it went unbraved
+        if (G.turnOmen != null) {
+          G.discard.push(G.turnOmen);
+          G.turnOmen = null;
+        }
+
+        // 1 · the Gloaming carries out what it telegraphed last turn
+        for (const it of G.intents) executeIntent(G, it, random as RandomAPI);
+        G.intents = [];
+        if (G.snuffCd > 0) G.snuffCd--; // the snuff cooldown ticks down each board phase
+
+        // 2 · the tide always rises (the knowable clock)
+        addNight(G, NIGHT_TIDE);
+
+        // 3 · the night may deepen into the next Act
+        const prevAct = G.act;
+        G.act = actFor(G.night, G.nightMax);
+        if (G.act > prevAct) {
+          flash(G, 'act-change');
+          log(G, `${ACT_NAMES[G.act]} falls. The Gloaming grows bolder.`, 'dread');
+        }
+
+        // 4 · choose + telegraph the next strike(s) (cunning, but you see it coming)
+        const k = intentCountFor(G.act);
+        const next: GloamingIntent[] = [];
+        for (let i = 0; i < k; i++) {
+          const it = chooseIntent(G, random as RandomAPI);
+          // avoid telegraphing the same beacon-snuff twice in one breath
+          if (next.some((q) => q.kind === it.kind && q.beaconNodeId === it.beaconNodeId && it.kind === 'snuff')) {
+            next.push({ kind: 'surge', telegraph: 'The night gathers itself to surge.' });
+          } else next.push(it);
+        }
+        G.intents = next;
       },
     },
 
     moves: {
-      // — resolve the active omen (gates all other moves while pending) —
-      resolveOmen: {
-        move: ({ G, ctx, random }, optionIndex: number) => {
-          if (!G.pendingEvent) return INVALID_MOVE;
-          const p = G.players[ctx.currentPlayer];
-          if (!p || !p.alive || p.dimmed) return INVALID_MOVE;
-          const card = eventById(G.pendingEvent.cardId);
-          const choice = card.choices[optionIndex];
-          if (!choice) return INVALID_MOVE;
-          for (const e of choice.effects) applyEffect(G, p, e, random as RandomAPI);
-          log(G, `${card.title} — ${choice.outcome}`, toneFor(card.type));
-          G.discard.push(G.pendingEvent.cardId);
-          G.pendingEvent = null;
-        },
-        undoable: false,
-      },
-
-      // — roll the movement die (once per turn) —
+      // — roll the Stride die (opens the turn) —
       rollStride: ({ G, ctx, random }) => {
-        if (G.pendingEvent) return INVALID_MOVE;
         const p = G.players[ctx.currentPlayer];
-        if (!p.alive || p.dimmed) return INVALID_MOVE;
-        if (G.hasRolled) return INVALID_MOVE;
+        if (!p || p.wisp || G.autoWisp) return INVALID_MOVE;
+        if (G.hasRolled || G.acted) return INVALID_MOVE;
         const r = random.D6();
         G.stride = r;
         G.lastRoll = r;
@@ -237,244 +242,116 @@ export function makeGloaming(config: GloamingConfig): Game<GState> {
         flash(G, 'dice');
       },
 
-      // — move one node along an edge, spending stride —
+      // — move one node along an edge, spending stride (sealed roads cost more) —
       moveTo: ({ G, ctx }, nodeId: number) => {
-        if (G.pendingEvent) return INVALID_MOVE;
         const p = G.players[ctx.currentPlayer];
-        if (!p.alive || p.dimmed) return INVALID_MOVE;
-        if (!G.hasRolled) return INVALID_MOVE;
-        const cur = G.nodes[p.nodeId];
-        if (!cur.neighbors.includes(nodeId)) return INVALID_MOVE;
-        const cost = isCorrupted(G, p.nodeId, nodeId) ? CORRUPT_EDGE_COST : 1;
+        if (!p || p.wisp || G.autoWisp) return INVALID_MOVE;
+        if (!G.hasRolled || G.acted) return INVALID_MOVE;
+        if (!G.nodes[p.nodeId].neighbors.includes(nodeId)) return INVALID_MOVE;
+        const cost = strideCostFor(G, p.nodeId, nodeId);
         if (G.stride < cost) return INVALID_MOVE;
         G.stride -= cost;
         p.nodeId = nodeId;
+        G.movedThisTurn = true;
       },
 
-      // — wellspring: gain embers OR light (a real tradeoff) —
-      gather: {
-        move: ({ G, ctx }, pick: 'embers' | 'light') => {
+      // — BRAVE: the bold, contextual play (then the board takes its turn) —
+      brave: {
+        move: ({ G, ctx, events, random }) => {
           const p = G.players[ctx.currentPlayer];
-          if (!p.alive || p.dimmed) return INVALID_MOVE;
-          if (G.nodes[p.nodeId].type !== 'wellspring') return INVALID_MOVE;
-          if (G.actionsTaken >= actionBudget(G)) return INVALID_MOVE;
-          if (pick === 'light') gainLight(p, GATHER_AMOUNT);
-          else gainEmbers(p, GATHER_AMOUNT);
-          G.actionsTaken++;
-          log(G, `${p.name} draws ${pick === 'light' ? 'warmth' : 'embers'} from the well.`, 'hope');
-        },
-        undoable: false,
-      },
-
-      // — beacon: deposit embers; lights at the threshold —
-      kindle: {
-        move: ({ G, ctx }, amount: number) => {
-          const p = G.players[ctx.currentPlayer];
-          if (!p.alive || p.dimmed) return INVALID_MOVE;
+          if (!p || p.wisp || G.autoWisp) return INVALID_MOVE;
+          if (!G.hasRolled || G.acted) return INVALID_MOVE;
           const node = G.nodes[p.nodeId];
-          if (node.type !== 'beacon') return INVALID_MOVE;
-          const beacon = G.beacons.find((b) => b.nodeId === p.nodeId);
-          if (!beacon || beacon.lit) return INVALID_MOVE;
-          if (G.actionsTaken >= actionBudget(G)) return INVALID_MOVE;
-          const need = EMBERS_PER_BEACON - beacon.embers;
-          const give = Math.min(amount, p.embers, need);
-          if (give <= 0) return INVALID_MOVE;
-          p.embers -= give;
-          G.actionsTaken++;
-          flash(G, 'kindle', p.nodeId);
-          log(G, `${p.name} feeds ${give} ember${give > 1 ? 's' : ''} to the Beacon.`, 'fellow');
-          addBeaconEmber(G, p.nodeId, give);
-        },
-        undoable: false,
-      },
 
-      // — shrine: gamble for a boon (draw an extra omen now) —
-      commune: {
-        move: ({ G, ctx, random }) => {
-          const p = G.players[ctx.currentPlayer];
-          if (!p.alive || p.dimmed) return INVALID_MOVE;
-          if (G.nodes[p.nodeId].type !== 'shrine') return INVALID_MOVE;
-          if (G.actionsTaken >= actionBudget(G)) return INVALID_MOVE;
-          if (G.pendingEvent) return INVALID_MOVE;
-          const cardId = drawOmen(G, random as RandomAPI);
-          G.actionsTaken++;
-          if (cardId === null) {
-            log(G, `${p.name} kneels at the shrine, but the dark has nothing left to say.`, 'neutral');
-            return;
-          }
-          const card = eventById(cardId);
-          log(G, `${p.name} communes at the shrine…`, 'neutral');
-          if (card.auto) {
-            for (const e of card.choices[0].effects) applyEffect(G, p, e, random as RandomAPI);
-            log(G, `${card.title} — ${card.choices[0].outcome}`, toneFor(card.type));
-            G.discard.push(cardId);
+          if (node.type === 'threshold') {
+            if (G.beaconsLit < 3) return INVALID_MOVE; // the gate is sealed
+            log(G, `${p.name} steps to the very edge of the dawn and waits for the others.`, 'hope');
           } else {
-            G.pendingEvent = { cardId };
+            const ok = applyBrave(G, p, random as RandomAPI);
+            if (!ok) return INVALID_MOVE;
           }
+          G.acted = true;
+          if (!checkGameover(G)) events.endTurn(); // let a winning move win before the board strikes
         },
         undoable: false,
       },
 
-      // — rest: recover light, spend tempo —
+      // — STEADY: the always-legal safe floor (+Ember) — no turn can dead-end —
       steady: {
-        move: ({ G, ctx }) => {
+        move: ({ G, ctx, events }) => {
           const p = G.players[ctx.currentPlayer];
-          if (!p.alive || p.dimmed) return INVALID_MOVE;
-          if (G.actionsTaken >= actionBudget(G)) return INVALID_MOVE;
-          gainLight(p, STEADY_LIGHT);
-          G.actionsTaken++;
-          log(G, `${p.name} steadies the flame and breathes.`, 'hope');
+          if (!p || p.wisp || G.autoWisp) return INVALID_MOVE;
+          if (!G.hasRolled || G.acted) return INVALID_MOVE;
+          gainEmber(p, steadyEmberAt(G, p));
+          G.acted = true;
+          log(G, `${p.name} steadies the flame and breathes. The lantern holds.`, 'hope');
+          if (!checkGameover(G)) events.endTurn();
         },
         undoable: false,
       },
 
-      // — help an ally on the same node: give / revive —
-      aid: {
-        move: ({ G, ctx }, targetId: string, kind: 'embers' | 'light' | 'revive', amount: number) => {
+      // — REKINDLE a fallen ally on your node (fellowship; spends your Ember) —
+      rekindle: {
+        move: ({ G, ctx, events }, targetId: string) => {
           const p = G.players[ctx.currentPlayer];
           const t = G.players[targetId];
-          if (!p.alive || p.dimmed) return INVALID_MOVE;
-          if (!t || t.id === p.id || !t.alive) return INVALID_MOVE;
+          if (!p || p.wisp || G.autoWisp) return INVALID_MOVE;
+          if (!G.hasRolled || G.acted) return INVALID_MOVE;
+          if (!t || t.id === p.id || !t.wisp) return INVALID_MOVE;
           if (t.nodeId !== p.nodeId) return INVALID_MOVE;
-
-          if (kind === 'revive') {
-            if (!t.dimmed) return INVALID_MOVE;
-            if (G.actionsTaken >= actionBudget(G)) return INVALID_MOVE;
-            if (p.light <= REVIVE_LIGHT_COST) return INVALID_MOVE;
-            p.light -= REVIVE_LIGHT_COST;
-            t.dimmed = false;
-            t.graced = false;
-            t.light = REVIVE_TARGET_LIGHT;
-            G.actionsTaken++;
-            log(G, `${p.name} lifts ${t.name} back into the light.`, 'fellow');
-            return;
-          }
-          if (kind === 'embers') {
-            const give = Math.min(amount, p.embers);
-            if (give <= 0) return INVALID_MOVE;
-            p.embers -= give;
-            gainEmbers(t, give);
-            log(G, `${p.name} shares ${give} ember${give > 1 ? 's' : ''} with ${t.name}.`, 'fellow');
-            return;
-          }
-          // light
-          const give = Math.min(amount, p.light - 1);
-          if (give <= 0) return INVALID_MOVE;
-          p.light -= give;
-          gainLight(t, give);
-          log(G, `${p.name} shares warmth with ${t.name}.`, 'fellow');
+          if (p.ember < REKINDLE_COST + 1) return INVALID_MOVE; // keep enough to not gutter out yourself
+          p.ember -= REKINDLE_COST;
+          t.wisp = false;
+          t.ember = REKINDLE_TARGET_EMBER;
+          flash(G, 'rekindle', t.nodeId);
+          log(G, `${p.name} cups their hands and breathes ${t.name} back into the light.`, 'fellow');
+          G.acted = true;
+          if (!checkGameover(G)) events.endTurn();
         },
         undoable: false,
       },
 
-      // — one-shot tools (free) —
-      useItem: {
-        move: ({ G, ctx }, itemId: ItemId) => {
-          const p = G.players[ctx.currentPlayer];
-          if (!p.alive || p.dimmed) return INVALID_MOVE;
-          const idx = p.items.indexOf(itemId);
-          if (idx === -1) return INVALID_MOVE;
-          if (itemId === 'ward') {
-            p.warded = true;
-            log(G, `${p.name} braces behind a warding charm.`, 'fellow');
-          } else if (itemId === 'oil') {
-            gainEmbers(p, 2);
-            log(G, `${p.name} pours out lantern-oil — embers flare.`, 'hope');
-          } else if (itemId === 'mapfrag') {
-            if (!cleanseEdgeNear(G, p.nodeId)) return INVALID_MOVE;
-            log(G, `${p.name} reads the map fragment; a corrupted path mends.`, 'hope');
-          }
-          p.items.splice(idx, 1);
-          flash(G, 'item');
-        },
-        undoable: false,
+      // — pass the turn (Wisp auto-drift, or an explicit skip after acting) —
+      endTurn: ({ G, events }) => {
+        if (!G.autoWisp && !G.acted) return INVALID_MOVE;
+        events.endTurn();
       },
 
-      // — push your luck: an extra action + a delve into the dark (rising risk) —
-      pressOn: ({ G, ctx, random }) => {
-        const p = G.players[ctx.currentPlayer];
-        if (!p.alive || p.dimmed) return INVALID_MOVE;
-        if (G.pendingEvent) return INVALID_MOVE;
-        if (G.pressOns >= PRESS_ON_MAX) return INVALID_MOVE;
-        G.pressOns++; // grants the extra action AND adds a Gloaming strike at turn end
-
-        // the delve — succeed on a high roll; the threshold climbs each press
-        const need = 2 + G.pressOns; // 1st press: ≥3, 2nd: ≥4
-        const r = random.D6();
-        G.lastRoll = r;
-        flash(G, 'dice');
-        if (r >= need) {
-          const kind = random.Die(3);
-          if (kind === 1) {
-            gainEmbers(p, 2);
-            log(G, `${p.name} presses into the dark and returns with embers (rolled ${r}).`, 'hope');
-          } else if (kind === 2) {
-            gainLight(p, 2);
-            log(G, `${p.name} presses on and finds a pocket of warmth (rolled ${r}).`, 'hope');
-          } else {
-            const it = ITEM_IDS[random.Die(ITEM_IDS.length) - 1];
-            p.items.push(it);
-            log(G, `${p.name} presses on and finds a ${ITEMS[it].name} in the gloom (rolled ${r}).`, 'hope');
-          }
-        } else {
-          // penalty scales with how hard you've pushed
-          addDread(G, G.pressOns);
-          drainLight(G, p, G.pressOns);
-          log(G, `${p.name} presses too far — the dark bites back, hard (rolled ${r}).`, 'dread');
-          flash(G, 'dread-strike');
-        }
-      },
-
-      // — the party's one accusation: turn on a suspected traitor —
+      // — the party's one accusation against a suspected Marked (4+) —
       castOut: {
         move: ({ G, ctx }, targetId: string) => {
           const p = G.players[ctx.currentPlayer];
           const t = G.players[targetId];
           if (!G.hasMarked || G.castOutUsed) return INVALID_MOVE;
-          if (!p.alive || p.dimmed || !!G.pendingEvent) return INVALID_MOVE;
+          if (!p || p.wisp || G.autoWisp) return INVALID_MOVE;
           if (!t || t.id === p.id) return INVALID_MOVE;
           G.castOutUsed = true;
           if (t.role === 'marked') {
             G.markedExposed = true;
-            addDread(G, -4);
-            log(G, `The circle turns on ${t.name} — and the dark recoils. ${t.name} was Marked. Their hand is stayed.`, 'fellow');
+            addNight(G, -4);
+            log(G, `The circle turns on ${t.name} — and the dark recoils. ${t.name} was Marked. Their hand is stilled.`, 'fellow');
           } else {
-            addDread(G, 4);
-            log(G, `${p.name} accuses ${t.name} — but the dark only laughs. ${t.name} was no traitor, and the night gains.`, 'dread');
+            addNight(G, 4);
+            log(G, `${p.name} accuses ${t.name} — but the dark only laughs. No traitor, and the night gains.`, 'dread');
           }
         },
         undoable: false,
       },
 
-      // — the Marked's covert sabotage: feed the dark with your own warmth —
+      // — the Marked's covert sabotage (Marked-only; feeds the night) —
       sow: ({ G, ctx }) => {
         const p = G.players[ctx.currentPlayer];
-        if (!p.alive || p.dimmed) return INVALID_MOVE;
-        if (p.role !== 'marked') return INVALID_MOVE;
-        if (G.markedExposed) return INVALID_MOVE; // exposed — the dark no longer answers you
-        if (G.sowedThisTurn || G.pendingEvent) return INVALID_MOVE;
-        if (p.light <= 1) return INVALID_MOVE; // can't sow yourself to the dark
+        if (!p || p.wisp || G.autoWisp) return INVALID_MOVE;
+        if (p.role !== 'marked' || G.markedExposed) return INVALID_MOVE;
+        if (G.sowedThisTurn) return INVALID_MOVE;
+        if (p.ember <= 2) return INVALID_MOVE; // can't sow yourself to a Wisp
         G.sowedThisTurn = true;
-        addDread(G, 1);
-        drainLight(G, p, 1); // self-cost — sow too greedily and you dim (a tell)
-        // ambient log — never names the culprit
+        addNight(G, 1);
+        drainEmber(G, p, 1); // self-cost — sow too greedily and you gutter (a tell)
         log(G, 'A chill that belongs to no season deepens. The dark gains, somehow.', 'dread');
-      },
-
-      // — end the turn (the board then plays back) —
-      endTurn: ({ G, events }) => {
-        if (G.pendingEvent) return INVALID_MOVE;
-        events.endTurn();
       },
     },
 
     endIf: ({ G }) => checkGameover(G),
-
-    // S2 will add: playerView to strip `secret` + others' role, and client:false role moves.
   };
-}
-
-// keep dread-tide rise local so onEnd reads cleanly
-function addDreadTide(G: GState): void {
-  G.dread = Math.min(G.dread + DREAD_TIDE_RISE, G.dreadMax);
 }

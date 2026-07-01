@@ -1,437 +1,263 @@
-import type { EventCard, ItemDef, ItemId } from './types';
+import type { OmenCard } from './types';
 
 /**
- * The Omen deck — hand-authored. Drawn at the start of each turn (and via
- * Commune). Choice-cards open the Narrator panel; `auto` cards resolve at draw.
- * Choices lean on *reducible* uncertainty: the narrator text tells you enough to
- * choose well (Costikyan, CLAUDE §6). ≥18 cards across all five types.
+ * The Omen deck — hand-authored. One omen hangs over each turn; it *resolves*
+ * only if a bearer settles on a hollow (the open road) or the Hearth. Each card
+ * carries the BRAVE branch — the bold, swingy, often risky play. STEADY (the
+ * universal safe option, +Ember) is the answer to all of them, so it isn't
+ * stored here. Leaning on *reducible* uncertainty: the narration tells you
+ * enough to choose well (Costikyan; CLAUDE §6).
+ *
+ * Effects use the v2 single-resource vocabulary: `ember` (to the actor),
+ * `night` (the clock), `beaconProgress` (nearest unlit Beacon), `sealEdge`,
+ * `cleanseEdge`, `drift`.
  */
 
-export const ITEMS: Record<ItemId, ItemDef> = {
-  ward: {
-    id: 'ward',
-    name: 'Warding Charm',
-    blurb: 'Negates the next Light the Gloaming would drain from you.',
-  },
-  oil: {
-    id: 'oil',
-    name: 'Vial of Lantern-Oil',
-    blurb: 'Pour out for +2 Embers, anywhere.',
-  },
-  mapfrag: {
-    id: 'mapfrag',
-    name: 'Map Fragment',
-    blurb: 'Cleanse one corrupted path back to safe footing.',
-  },
-};
-
-export const OMEN_DECK: EventCard[] = [
+export const OMEN_DECK: OmenCard[] = [
   // ───────────────────────── GIFTS ─────────────────────────
   {
     id: 0,
-    type: 'gift',
+    tone: 'gift',
     title: 'The Ember Cache',
-    narrator:
+    narration:
       'Beneath a cairn of cold stones, a hoard of embers still breathes — faint, but willing. Taking them will make noise in the dark.',
-    choices: [
-      {
-        label: 'Take all of it (+3 Embers, +1 Dread)',
-        outcome: 'You scoop the living coals into your lantern. Something far off turns to listen.',
-        effects: [
-          { kind: 'embers', amount: 3, note: '+3 embers' },
-          { kind: 'dread', amount: 1, note: 'the dark stirs' },
-        ],
-      },
-      {
-        label: 'Take only a handful (+1 Ember)',
-        outcome: 'You take what you need and leave the rest glowing. The quiet holds.',
-        effects: [{ kind: 'embers', amount: 1, note: '+1 ember' }],
-      },
-    ],
+    brave: {
+      label: 'Take the cache (+4 Ember, +1 Night)',
+      outcome: 'You scoop the living coals into your lantern. Something far off turns to listen.',
+      effects: [
+        { kind: 'ember', amount: 4, note: '+4 ember' },
+        { kind: 'night', amount: 1, note: 'the dark stirs' },
+      ],
+    },
   },
   {
     id: 1,
-    type: 'gift',
-    title: 'A Kind Stranger',
-    narrator:
-      'A hooded figure presses something cold into your palm and is gone before you can ask a name.',
-    choices: [
-      {
-        label: 'Keep the charm (gain Warding Charm)',
-        outcome: 'A warding charm, old and warm to the touch. It hums against the cold.',
-        effects: [{ kind: 'grantItem', item: 'ward', note: 'gained a Warding Charm' }],
-      },
-    ],
+    tone: 'gift',
+    title: 'Moonwell',
+    narration:
+      'A pool of pale water holds the reflection of a moon that no longer rises. Drink, and be filled.',
+    brave: {
+      label: 'Drink deep (+5 Ember)',
+      outcome: 'Warmth floods through you. For a moment the dusk feels survivable.',
+      effects: [{ kind: 'ember', amount: 5, note: '+5 ember' }],
+    },
   },
   {
     id: 2,
-    type: 'gift',
-    title: 'Moonwell',
-    narrator: 'A pool of pale water holds the reflection of a moon that no longer rises. You drink.',
-    choices: [
-      {
-        label: 'Drink deep (+3 Light)',
-        outcome: 'Warmth spreads through you. For a moment the dusk feels survivable.',
-        effects: [{ kind: 'light', amount: 3, note: '+3 light' }],
-      },
-    ],
+    tone: 'gift',
+    title: "The Cartographer's Gift",
+    narration:
+      'A satchel left at a crossroads, its owner long gone. Inside, a torn map whose lines redraw themselves as you watch — a way through the thorns.',
+    brave: {
+      label: 'Read the map (clear a thorned road, +1 Ember)',
+      outcome: 'The rot unknits along one road. You breathe easier.',
+      effects: [
+        { kind: 'cleanseEdge', note: 'a road clears' },
+        { kind: 'ember', amount: 1, note: '+1 ember' },
+      ],
+    },
   },
   {
     id: 3,
-    type: 'gift',
-    title: "The Cartographer's Gift",
-    narrator: 'A satchel left at a crossroads, its owner long gone. Inside: a torn scrap of vellum.',
-    choices: [
-      {
-        label: 'Pocket the fragment (gain Map Fragment)',
-        outcome: 'The lines redraw themselves as you watch. A way through the rot.',
-        effects: [{ kind: 'grantItem', item: 'mapfrag', note: 'gained a Map Fragment' }],
-      },
-      {
-        label: 'Burn it for warmth (+2 Light)',
-        outcome: 'You feed the vellum to your lantern. The map is gone, but you are warmer.',
-        effects: [{ kind: 'light', amount: 2, note: '+2 light' }],
-      },
-    ],
+    tone: 'gift',
+    title: 'A Moment of Stillness',
+    narration: 'For one breath, the dusk is almost beautiful. You let it fill you, and steady your flame.',
+    brave: {
+      label: 'Breathe it in (+3 Ember)',
+      outcome: 'The quiet is a gift. You take it and walk on, warmer.',
+      effects: [{ kind: 'ember', amount: 3, note: '+3 ember' }],
+    },
   },
 
   // ───────────────────────── TRAPS ─────────────────────────
   {
     id: 4,
-    type: 'trap',
+    tone: 'trap',
     title: 'Sinkhole of Ash',
-    narrator:
-      'The ground sighs and gives way. Ash pours into your boots, into your lungs, pulling the warmth out of you.',
-    choices: [
-      {
-        label: 'Climb out fast (−2 Light, or 0 if Warded)',
-        outcome: 'You haul yourself free, coughing grey. A charm may yet spare you the worst.',
-        effects: [{ kind: 'light', amount: -2, note: 'the ash takes its toll' }],
-      },
-    ],
+    narration:
+      'The ground sighs and gives way. Buried in the ash below — the glint of old embers, if you are willing to climb down for them.',
+    brave: {
+      label: 'Dig for the embers (+4 Ember, −2 paid as Night)',
+      outcome: 'You haul up a fistful of cold fire, coughing grey. The dark drinks your noise.',
+      effects: [
+        { kind: 'ember', amount: 4, note: '+4 ember' },
+        { kind: 'night', amount: 2, note: 'the ash feeds the night' },
+      ],
+    },
   },
   {
     id: 5,
-    type: 'trap',
+    tone: 'trap',
     title: 'The Grasping Dark',
-    narrator:
-      'Roots of shadow erupt across the path behind you and fuse into something that no longer remembers being a road.',
-    choices: [
-      {
-        label: 'Press on (a path near you corrupts)',
-        outcome: 'You stagger forward. Behind you, the way you came is no longer a way.',
-        effects: [{ kind: 'corruptEdge', note: 'a path corrupts' }],
-      },
-    ],
+    narration:
+      'Roots of shadow erupt across the path and snatch at something near a Beacon you can almost see. Wrench it loose and you might fling fire its way.',
+    brave: {
+      label: 'Wrench it free (+2 to a Beacon, a road seals)',
+      outcome: 'You tear the warmth loose and hurl it toward the Beacon — but behind you, a road is gone.',
+      effects: [
+        { kind: 'beaconProgress', amount: 2, note: 'a distant Beacon brightens' },
+        { kind: 'sealEdge', note: 'a road seals behind you' },
+      ],
+    },
   },
   {
     id: 6,
-    type: 'trap',
+    tone: 'trap',
     title: 'Cold Snap',
-    narrator:
-      'The air crystallises without warning. Frost climbs your lantern-glass and gnaws at the flame.',
-    choices: [
-      {
-        label: 'Shield the flame (−1 Light)',
-        outcome: 'You cup the light with both hands until the cold relents. It costs you.',
-        effects: [{ kind: 'light', amount: -1, note: '−1 light' }],
-      },
-      {
-        label: 'Feed it embers instead (−2 Embers)',
-        outcome: 'You pour embers into the lantern to keep it burning. The flame survives.',
-        effects: [{ kind: 'embers', amount: -2, note: '−2 embers' }],
-      },
-    ],
-  },
-  {
-    id: 7,
-    type: 'trap',
-    title: 'Mirefoot',
-    narrator: 'Black water, deeper than it looked. Every step is a negotiation with the dark.',
-    choices: [
-      {
-        label: 'Wade through (−1 Light, +1 Dread)',
-        outcome: 'You drag yourself to firmer ground. The mire remembers your weight.',
-        effects: [
-          { kind: 'light', amount: -1, note: '−1 light' },
-          { kind: 'dread', amount: 1, note: 'the mire feeds' },
-        ],
-      },
-    ],
-  },
-
-  // ───────────────────────── RIDDLES ─────────────────────────
-  {
-    id: 8,
-    type: 'riddle',
-    title: 'The Three Doors',
-    narrator:
-      'Three doors stand in a wall with no house. Above them, carved deep: PATIENCE feeds the body, WISDOM the lantern, GREED takes more than it gives.',
-    choices: [
-      {
-        label: 'Patience (+3 Light)',
-        outcome: 'The patient door opens onto rest. You breathe, and are restored.',
-        effects: [{ kind: 'light', amount: 3, note: 'patience restores' }],
-      },
-      {
-        label: 'Wisdom (+2 Embers)',
-        outcome: 'The wise door gives exactly what the journey needs. No more.',
-        effects: [{ kind: 'embers', amount: 2, note: 'wisdom provides' }],
-      },
-      {
-        label: 'Greed (+4 Embers, +2 Dread)',
-        outcome: 'The greedy door overflows — and something behind it wakes, hungry.',
-        effects: [
-          { kind: 'embers', amount: 4, note: '+4 embers' },
-          { kind: 'dread', amount: 2, note: 'greed wakes the dark' },
-        ],
-      },
-    ],
-  },
-  {
-    id: 9,
-    type: 'riddle',
-    title: "The Tide's Question",
-    narrator:
-      '"I rise whether you act or sleep," whispers the dark. "Spend, and I slow. Hoard, and I quicken. What will you give?"',
-    choices: [
-      {
-        label: 'Give Embers to the tide (−2 Embers, −2 Dread)',
-        outcome: 'You cast embers into the black water. It recedes, sated — for now.',
-        effects: [
-          { kind: 'embers', amount: -2, note: '−2 embers' },
-          { kind: 'dread', amount: -2, note: 'the tide recedes' },
-        ],
-      },
-      {
-        label: 'Refuse it (+1 Dread)',
-        outcome: 'You keep what is yours. The tide only smiles — and rises.',
-        effects: [{ kind: 'dread', amount: 1, note: 'the tide rises, unfed' }],
-      },
-    ],
-  },
-  {
-    id: 10,
-    type: 'riddle',
-    title: 'Whisper of Names',
-    narrator:
-      'A voice recites the names of everyone you have lost. It offers to stop — for a price paid in warmth or in light remembered.',
-    choices: [
-      {
-        label: 'Pay in warmth (−2 Light)',
-        outcome: 'You give it your warmth and it falls silent, satisfied.',
-        effects: [{ kind: 'light', amount: -2, note: '−2 light' }],
-      },
-      {
-        label: 'Pay in embers (−3 Embers)',
-        outcome: 'You give it embers to chew on. The names stop.',
-        effects: [{ kind: 'embers', amount: -3, note: '−3 embers' }],
-      },
-      {
-        label: 'Listen to the end (+1 Dread, +2 Light)',
-        outcome: 'You let it finish. Grief, strangely, steadies the flame — but the dark grows.',
-        effects: [
-          { kind: 'light', amount: 2, note: 'grief steadies you' },
-          { kind: 'dread', amount: 1, note: 'the dark leans close' },
-        ],
-      },
-    ],
+    narration:
+      'The air crystallises without warning. Frost climbs your lantern-glass. Push through fast and you can outrun the worst of it.',
+    brave: {
+      label: 'Run through the frost (−2 Ember, +2 to a Beacon)',
+      outcome: 'You sprint the killing cold and skid out the far side, hurling your spare warmth at the nearest Beacon as you go.',
+      effects: [
+        { kind: 'ember', amount: -2, note: '−2 ember' },
+        { kind: 'beaconProgress', amount: 2, note: 'warmth flung ahead' },
+      ],
+    },
   },
 
   // ───────────────────────── BARGAINS ─────────────────────────
   {
-    id: 11,
-    type: 'bargain',
+    id: 7,
+    tone: 'bargain',
     title: 'The Pale Merchant',
-    narrator:
-      'A figure of grey cloth and grey teeth spreads its wares on the ash. "Light for time," it offers. "A fair trade, for those in a hurry to die slower."',
-    choices: [
-      {
-        label: 'Trade Light for time (−2 Light, −3 Dread)',
-        outcome: 'The merchant drinks your warmth and the night, briefly, holds its breath.',
-        effects: [
-          { kind: 'light', amount: -2, note: '−2 light' },
-          { kind: 'dread', amount: -3, note: 'the night holds its breath' },
-        ],
-      },
-      {
-        label: 'Walk away (−1 Light)',
-        outcome: 'You leave the merchant to its ash. It flicks a curse at your back as you go.',
-        effects: [{ kind: 'light', amount: -1, note: 'a parting curse' }],
-      },
-    ],
+    narration:
+      'A figure of grey cloth and grey teeth spreads its wares on the ash. "Warmth for time," it offers. "A fair trade, for those in a hurry to die slower."',
+    brave: {
+      label: 'Trade warmth for time (−3 Ember, −4 Night)',
+      outcome: 'The merchant drinks your warmth and the night, briefly, holds its breath.',
+      effects: [
+        { kind: 'ember', amount: -3, note: '−3 ember' },
+        { kind: 'night', amount: -4, note: 'the night holds its breath' },
+      ],
+    },
+  },
+  {
+    id: 8,
+    tone: 'bargain',
+    title: 'Borrowed Flame',
+    narration:
+      'A brazier offers you fire it has not finished burning. Take it now, and the cold will come collecting later.',
+    brave: {
+      label: 'Borrow the flame (+6 Ember, +2 Night)',
+      outcome: 'You take the borrowed fire. The debt settles into the dark, to be paid in time.',
+      effects: [
+        { kind: 'ember', amount: 6, note: '+6 ember' },
+        { kind: 'night', amount: 2, note: 'the cold will collect' },
+      ],
+    },
+  },
+  {
+    id: 9,
+    tone: 'bargain',
+    title: 'The Oathstone',
+    narration:
+      'A standing stone, its mouth carved open mid-word. Swear an oath of embers upon it and it will carry your fire to a Beacon you cannot reach.',
+    brave: {
+      label: 'Swear the oath (−3 Ember, +3 to a Beacon)',
+      outcome: 'Your embers vanish into the stone and rekindle, far away, where a Beacon waits.',
+      effects: [
+        { kind: 'ember', amount: -3, note: '−3 ember' },
+        { kind: 'beaconProgress', amount: 3, note: 'a distant Beacon brightens' },
+      ],
+    },
+  },
+
+  // ───────────────────────── RIDDLES ─────────────────────────
+  {
+    id: 10,
+    tone: 'riddle',
+    title: 'The Three Doors',
+    narration:
+      'Three doors in a wall with no house. Carved deep above them: GREED takes more than it gives. The greedy door overflows — and wakes something behind it.',
+    brave: {
+      label: 'Open the greedy door (+6 Ember, +3 Night)',
+      outcome: 'The door overflows with fire — and far below, something hungry opens an eye.',
+      effects: [
+        { kind: 'ember', amount: 6, note: '+6 ember' },
+        { kind: 'night', amount: 3, note: 'greed wakes the dark' },
+      ],
+    },
+  },
+  {
+    id: 11,
+    tone: 'riddle',
+    title: "The Tide's Question",
+    narration:
+      '"I rise whether you act or sleep," whispers the dark. "Cast warmth into me and I recede. Refuse, and I quicken. What will you give?"',
+    brave: {
+      label: 'Feed the tide (−2 Ember, −3 Night)',
+      outcome: 'You cast embers into the black water. It recedes, sated — for now.',
+      effects: [
+        { kind: 'ember', amount: -2, note: '−2 ember' },
+        { kind: 'night', amount: -3, note: 'the tide recedes' },
+      ],
+    },
   },
   {
     id: 12,
-    type: 'bargain',
-    title: 'Borrowed Flame',
-    narrator:
-      'A brazier offers you fire it has not finished burning. Take it now, and the cold will come collecting later.',
-    choices: [
-      {
-        label: 'Borrow the flame (+3 Embers, −2 Light)',
-        outcome: 'You take the borrowed fire. The debt settles into your bones.',
-        effects: [
-          { kind: 'embers', amount: 3, note: '+3 embers' },
-          { kind: 'light', amount: -2, note: 'the cold collects' },
-        ],
-      },
-      {
-        label: 'Leave it burning (−1 Light)',
-        outcome: 'You refuse the debt. The cold leans in close, offended by your caution.',
-        effects: [{ kind: 'light', amount: -1, note: 'the cold leans in' }],
-      },
-    ],
-  },
-  {
-    id: 13,
-    type: 'bargain',
-    title: 'The Oathstone',
-    narrator:
-      'A standing stone, mouth carved open mid-word. Swear an oath of embers upon it and it will carry your fire to a Beacon you cannot reach.',
-    choices: [
-      {
-        label: 'Swear the oath (−2 Embers, +1 Ember to nearest Beacon)',
-        outcome: 'Your embers vanish into the stone and rekindle, far away, where a Beacon waits.',
-        effects: [
-          { kind: 'embers', amount: -2, note: '−2 embers' },
-          { kind: 'beaconEmber', amount: 1, note: 'a distant Beacon brightens' },
-        ],
-      },
-      {
-        label: 'Keep your fire (+1 Dread)',
-        outcome: 'You keep your embers close. A refused oath offends the dark; it presses nearer.',
-        effects: [{ kind: 'dread', amount: 1, note: 'a refused oath' }],
-      },
-    ],
+    tone: 'riddle',
+    title: 'Whisper of Names',
+    narration:
+      'A voice recites the names of everyone you have lost, and offers to stop — if you will only listen to the end. Grief, strangely, steadies the flame.',
+    brave: {
+      label: 'Listen to the end (+4 Ember, +1 Night)',
+      outcome: 'You let it finish. The names settle into warmth — but the dark leaned close to hear them too.',
+      effects: [
+        { kind: 'ember', amount: 4, note: 'grief steadies you' },
+        { kind: 'night', amount: 1, note: 'the dark leaned close' },
+      ],
+    },
   },
 
   // ───────────────────────── STALKERS ─────────────────────────
   {
-    id: 14,
-    type: 'stalker',
+    id: 13,
+    tone: 'stalker',
     title: 'A Shape in the Fog',
-    narrator:
-      'Something tall and patient stands at the edge of your light. It does not approach. It simply waits to be the last thing you see.',
-    choices: [
-      {
-        label: 'Keep moving (+1 Dread, it marks you)',
-        outcome: 'You do not run — running is what it wants. But its eyes fix on you now, and the dark thickens.',
-        effects: [
-          { kind: 'dread', amount: 1, note: 'the shape follows' },
-          { kind: 'doubleNextDrain', note: 'it has marked you' },
-        ],
-      },
-    ],
-    auto: false,
+    narration:
+      'Something tall and patient stands at the edge of your light. It does not approach. It waits to be the last thing you see. Hold your ground and it costs you nothing but nerve.',
+    brave: {
+      label: 'Stare it down (+2 Ember, +1 Night)',
+      outcome: 'You do not run — running is what it wants. It withdraws, and the small victory warms you. But it knows your face now.',
+      effects: [
+        { kind: 'ember', amount: 2, note: 'nerve held' },
+        { kind: 'night', amount: 1, note: 'it remembers you' },
+      ],
+    },
+  },
+  {
+    id: 14,
+    tone: 'stalker',
+    title: 'It Knows Your Name',
+    narration:
+      'The wind shapes a sound that is unmistakably your name, spoken with terrible tenderness. Answer it, and you might learn where the dark is thinnest.',
+    brave: {
+      label: 'Answer once (−2 Ember, +2 to a Beacon)',
+      outcome: 'You answer, and for a heartbeat the dark parts — long enough to fling warmth at a waiting Beacon. Then it closes, hungrier.',
+      effects: [
+        { kind: 'ember', amount: -2, note: 'it tastes your warmth' },
+        { kind: 'beaconProgress', amount: 2, note: 'the dark parts, briefly' },
+      ],
+    },
   },
   {
     id: 15,
-    type: 'stalker',
-    title: 'It Knows Your Name',
-    narrator:
-      'The wind shapes a sound that is unmistakably your name, spoken with terrible tenderness.',
-    choices: [
-      {
-        label: 'Refuse to answer (−1 Light, next drain doubles)',
-        outcome: 'You bite down on the urge to reply — but it has your scent now, and a sliver of your warmth. The next cold will bite deeper.',
-        effects: [
-          { kind: 'light', amount: -1, note: 'it tastes your warmth' },
-          { kind: 'doubleNextDrain', note: 'the next drain doubles' },
-        ],
-      },
-    ],
-  },
-  {
-    id: 16,
-    type: 'stalker',
+    tone: 'stalker',
     title: 'The Long Pursuit',
-    narrator: 'You have been walking for hours and the same footprints keep crossing your own.',
-    choices: [
-      {
-        label: 'Break the trail',
-        outcome: 'You double back and scatter your path — but the effort costs the whole party. The dark gains.',
-        effects: [{ kind: 'dread', amount: 2, note: 'the pursuit closes' }],
-      },
-    ],
-  },
-  {
-    id: 17,
-    type: 'stalker',
-    title: 'Hands Beneath the Ice',
-    narrator: 'Pale hands press up against the underside of the frozen path, reaching for your heat.',
-    choices: [
-      {
-        label: 'Step lightly (−1 Light)',
-        outcome: 'You cross on the balls of your feet. One hand grazes your warmth before you are past.',
-        effects: [{ kind: 'light', amount: -1, note: '−1 light' }],
-      },
-      {
-        label: 'Pour embers on the ice (−2 Embers)',
-        outcome: 'You scatter embers across the ice; the hands recoil from the heat.',
-        effects: [{ kind: 'embers', amount: -2, note: '−2 embers' }],
-      },
-    ],
-  },
-
-  // ───────────────────────── AUTO / TIDE FLAVOR ─────────────────────────
-  {
-    id: 18,
-    type: 'gift',
-    title: 'A Moment of Stillness',
-    narrator: 'For one breath, the dusk is almost beautiful. You let it fill you.',
-    choices: [
-      {
-        label: 'Continue (+1 Light)',
-        outcome: 'The quiet is a gift. You take it and walk on.',
-        effects: [{ kind: 'light', amount: 1, note: '+1 light' }],
-      },
-    ],
-    auto: true,
-  },
-  {
-    id: 19,
-    type: 'stalker',
-    title: 'The Tide Mutters',
-    narrator: 'Far off, the black water rises another hand-span. No one has to tell you.',
-    choices: [
-      {
-        label: 'Continue (+1 Dread)',
-        outcome: 'The world dims by a degree.',
-        effects: [{ kind: 'dread', amount: 1, note: 'the tide rises' }],
-      },
-    ],
-    auto: true,
-  },
-  {
-    id: 20,
-    type: 'trap',
-    title: 'Frayed Footing',
-    narrator: 'The path underfoot has begun to come apart at the seams.',
-    choices: [
-      {
-        label: 'Continue (a path corrupts)',
-        outcome: 'A road unravels somewhere in the web.',
-        effects: [{ kind: 'corruptEdge', note: 'a path frays' }],
-      },
-    ],
-    auto: true,
-  },
-  {
-    id: 21,
-    type: 'gift',
-    title: 'Lantern-Oil in the Reeds',
-    narrator: 'A stoppered vial, half-buried, still sloshing with old oil.',
-    choices: [
-      {
-        label: 'Take the vial (gain Vial of Lantern-Oil)',
-        outcome: 'You pocket the oil. It will keep a flame fed when you need it most.',
-        effects: [{ kind: 'grantItem', item: 'oil', note: 'gained Lantern-Oil' }],
-      },
-    ],
+    narration:
+      'You have walked for hours and the same footprints keep crossing your own. Double back hard and you can scatter the trail — but it costs the whole party effort.',
+    brave: {
+      label: 'Break the trail (clear a road, +1 Night)',
+      outcome: 'You scatter your path and tear one thorned road open in the doubling-back. The pursuit loses you, for now.',
+      effects: [
+        { kind: 'cleanseEdge', note: 'a road opens' },
+        { kind: 'night', amount: 1, note: 'the effort tells' },
+      ],
+    },
   },
 ];
 
-export function eventById(id: number): EventCard {
+export function eventById(id: number): OmenCard {
   return OMEN_DECK[id];
 }

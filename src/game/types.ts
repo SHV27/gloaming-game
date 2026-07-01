@@ -1,7 +1,8 @@
 /**
- * GLOAMING — game-state types.
- * Shaped now so Session 2 can drop in a hidden-traitor role via boardgame.io
- * `playerView` (strip `secret` + other players' `role`) with no refactor.
+ * GLOAMING v2 — game-state types.
+ * One resource (Ember), one decision (Brave/Steady), a telegraphing Gloaming.
+ * Hidden-role (4+) still rides boardgame.io `playerView` (strip other seats'
+ * `role` + null `secret.markedId`) — no refactor needed.
  */
 
 export type NodeType =
@@ -21,15 +22,7 @@ export interface BoardNode {
   label?: string;
 }
 
-export type ItemId = 'ward' | 'oil' | 'mapfrag';
-
-export interface ItemDef {
-  id: ItemId;
-  name: string;
-  blurb: string;
-}
-
-/** Reserved for S2; present but unassigned this session. */
+/** Reserved for the 4+ hidden traitor. */
 export type Role = 'bearer' | 'marked';
 
 export interface Player {
@@ -37,61 +30,79 @@ export interface Player {
   name: string;
   seat: number; // index → SEAT_COLORS
   nodeId: number;
-  light: number;
-  embers: number;
-  items: ItemId[];
-  alive: boolean;
-  dimmed: boolean; // light hit 0 — downed but revivable
-  graced: boolean; // freshly dimmed — survives one more strike (grace so allies can reach)
-  warded: boolean; // next light-drain negated (brace via useItem 'ward')
-  doubleDrain: boolean; // next light-drain doubled (telegraphed by a Stalker)
-  role?: Role; // S2
+  ember: number; // THE resource — life + fuel + currency
+  wisp: boolean; // ember hit 0 — drifts toward the Hearth, can't Brave, can be Rekindled
+  role?: Role;
 }
 
 export interface Beacon {
   nodeId: number;
-  embers: number;
+  progress: number; // 0..need — a tug-of-war (the Gloaming can SNUFF it down)
   lit: boolean;
 }
 
-// ── Event deck ────────────────────────────────────────────────────────────
+// ── The three Acts of the deepening night ───────────────────────────────────
+export type Act = 0 | 1 | 2; // Dusk · The Gloaming · Pitch
+
+// ── The Gloaming's telegraphed intents (the living automa) ───────────────────
+export type IntentKind = 'surge' | 'seal' | 'stalk' | 'snuff';
+export interface GloamingIntent {
+  kind: IntentKind;
+  beaconNodeId?: number; // SNUFF target
+  edge?: [number, number]; // SEAL target
+  telegraph: string; // the warning shown to the party this turn
+}
+
+// ── The Omen deck (the place reacting) ──────────────────────────────────────
+// An omen defines what BRAVING it does (the bold/risky outcome). STEADY is the
+// universal safe option (+Ember), so omen cards carry only the brave branch.
 export type EffectKind =
-  | 'light'
-  | 'embers'
-  | 'dread'
-  | 'corruptEdge'
+  | 'ember' // +/- to the actor
+  | 'night' // +/- the Night track
+  | 'beaconProgress' // + to the nearest unlit beacon
+  | 'sealEdge'
   | 'cleanseEdge'
-  | 'grantItem'
-  | 'beaconEmber'
-  | 'ward'
-  | 'pullToDark'
-  | 'doubleNextDrain';
+  | 'drift'; // shoved to a random neighbor (a setback)
 
 export interface Effect {
   kind: EffectKind;
   amount?: number;
-  item?: ItemId;
   note?: string; // short outcome fragment for the log
 }
 
-export type EventType = 'gift' | 'trap' | 'riddle' | 'bargain' | 'stalker';
+export type OmenTone = 'gift' | 'trap' | 'bargain' | 'riddle' | 'stalker';
 
-export interface Choice {
-  label: string;
-  outcome: string; // narrator resolution text
+export interface OmenBrave {
+  label: string; // the Brave button text
+  outcome: string; // narrator resolution
   effects: Effect[];
 }
 
-export interface EventCard {
+export interface OmenCard {
   id: number;
-  type: EventType;
+  tone: OmenTone;
   title: string;
-  narrator: string; // the omen text
-  choices: Choice[]; // 1–3; a single "Continue" choice == auto-narration
-  auto?: boolean; // resolve immediately at draw (no panel) — used for pure tide flavor
+  narration: string; // the omen text (the place reacting)
+  brave: OmenBrave;
 }
 
-// ── Log ─────────────────────────────────────────────────────────────────
+// ── The live reaction shown when a bearer settles on a tile (computed) ───────
+export interface ReactionAction {
+  label: string;
+  enabled: boolean;
+  reason?: string; // why disabled (shown to teach)
+  preview?: string; // the consequence preview (cost/reward)
+}
+export interface Reaction {
+  tile: NodeType;
+  tone: OmenTone | 'calm';
+  title: string;
+  narration: string;
+  brave: ReactionAction;
+  steady: ReactionAction;
+}
+
+// ── Log ─────────────────────────────────────────────────────────────────────
 export type LogTone = 'neutral' | 'hope' | 'dread' | 'fellow';
 export interface LogEntry {
   id: number;
@@ -100,15 +111,18 @@ export interface LogEntry {
   tone: LogTone;
 }
 
-// ── UI cue channel (drives shake / bloom / sound off pure state) ──────────
+// ── UI cue channel (drives shake / bloom / sound off pure state) ─────────────
 export type FlashKind =
-  | 'dread-strike'
-  | 'beacon-lit'
   | 'dice'
-  | 'dimmed'
-  | 'item'
   | 'kindle'
-  | 'stalker';
+  | 'beacon-lit'
+  | 'snuff'
+  | 'stalker'
+  | 'surge'
+  | 'act-change'
+  | 'wisp'
+  | 'rekindle'
+  | 'cross';
 export interface Flash {
   kind: FlashKind;
   nonce: number;
@@ -118,51 +132,51 @@ export interface Flash {
 export type Winner = 'lanternbearers' | 'gloaming' | 'marked';
 export interface GameoverState {
   winner: Winner;
-  reason: 'crossed' | 'nightfell' | 'all-lost' | 'marked-triumph' | 'marked-foiled';
-  markedId?: string | null; // revealed at game end
+  reason: 'crossed' | 'nightfell' | 'marked-triumph' | 'marked-foiled';
+  markedId?: string | null;
 }
 
-// ── The whole game state ──────────────────────────────────────────────────
+// ── The whole game state ─────────────────────────────────────────────────────
 export interface GState {
   players: Record<string, Player>;
   nodes: BoardNode[];
-  corruptedEdges: Array<[number, number]>;
+  sealedEdges: Array<[number, number]>; // the Gloaming has blocked these paths
   beacons: Beacon[];
   beaconsLit: number;
   thresholdId: number;
+  beaconNeed: number;
 
-  dread: number;
-  dreadMax: number;
+  night: number;
+  nightMax: number;
+  act: Act;
 
   deck: number[]; // indices into OMEN_DECK
   discard: number[];
-  pendingEvent: { cardId: number } | null;
+  turnOmen: number | null; // the omen hanging over this turn (resolves iff you settle on a hollow/hearth)
+
+  // The Gloaming automa
+  intents: GloamingIntent[]; // telegraphed now, executed at the next board phase
+  stalker: { active: boolean; nodeId: number } | null;
+  snuffCd: number; // turns until the Gloaming may snuff a beacon again
 
   // per-turn scratch (reset in turn.onBegin)
   stride: number;
   hasRolled: boolean;
-  actionsTaken: number;
-  pressOns: number;
-  boardActed: boolean;
+  movedThisTurn: boolean;
+  acted: boolean; // a Brave/Steady/Rekindle has been taken — turn is resolving
+  boardActed: boolean; // idempotency guard for the onEnd board phase
   lastRoll: number | null;
+  autoWisp: boolean; // this turn is a Wisp's auto-drift — UI/sim just pass
 
   log: LogEntry[];
   logSeq: number;
   flash: Flash | null;
   flashSeq: number;
 
-  // The Stalker — a hunting entity the Gloaming spawns at higher Dread
-  stalker: { active: boolean; nodeId: number } | null;
-
-  // per-turn marker for the Marked's covert action
+  // The Marked (hidden role, 4+) — public mode flags + Secret State
+  hasMarked: boolean;
+  castOutUsed: boolean;
+  markedExposed: boolean;
   sowedThisTurn: boolean;
-
-  // The Marked / accusation (all public — not secret)
-  hasMarked: boolean; // a Marked exists this game (the table knows the mode)
-  castOutUsed: boolean; // the once-per-game accusation has been spent
-  markedExposed: boolean; // a correct Cast Out has silenced the Marked's Sow
-
-  // Secret State — hidden from every client via playerView (only your own
-  // `role` survives the strip). `markedId` is nulled out for everyone.
   secret: { markedId: string | null };
 }
