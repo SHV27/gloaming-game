@@ -31,7 +31,7 @@ const STEPS: Step[] = [
   {
     eyebrow: 'The world',
     title: 'You walk into the Gloaming',
-    body: 'Dusk is becoming night, and night here is a hungry thing. You are Lanternbearers. Light the three Beacons, then bring every bearer to the Threshold — and cross before the dark drinks the last of your light.',
+    body: 'Dusk is becoming night, and the night here is alive — and it is hunting you. You are Lanternbearers. Light the three Beacons, gather every bearer at the Threshold, and cross together — before the Night drowns the last of the light.',
     accent: ember,
     motif: (c) => (
       <g>
@@ -42,70 +42,60 @@ const STEPS: Step[] = [
     ),
   },
   {
-    eyebrow: 'The clock',
-    title: 'The Dread tide only rises',
-    body: 'On the left, a column of black water. Every turn it climbs — and as it does, the whole world dims and cools and a heartbeat quickens. Past its midnight, the dark strikes harder and a Stalker wakes. Read the tide. Race it.',
-    accent: dread,
-    motif: (c) => (
-      <g>
-        <rect x="48" y="14" width="24" height="92" rx="12" fill="none" stroke={c} strokeWidth="2" opacity="0.5" />
-        <rect x="48" y="56" width="24" height="50" rx="12" fill={c} opacity="0.85" />
-        <path d="M48 56 q12 -8 24 0" fill="none" stroke="var(--color-dread-bright)" strokeWidth="2" />
-      </g>
-    ),
-  },
-  {
-    eyebrow: 'Your turn — first',
-    title: 'An Omen, and a price',
-    body: 'Each turn opens with an Omen the board whispers to you. Every choice has a cost shown in plain chips — embers, warmth, dread. There are no free gifts in the dark; choose the price you can pay.',
-    accent: glacier,
-    motif: (c) => (
-      <g>
-        <rect x="34" y="22" width="52" height="72" rx="6" fill="none" stroke={c} strokeWidth="2" />
-        <path d="M44 40 h32 M44 52 h32 M44 64 h20" stroke={c} strokeWidth="2" strokeLinecap="round" opacity="0.7" />
-        <rect x="44" y="76" width="32" height="10" rx="3" fill={c} opacity="0.3" />
-      </g>
-    ),
-  },
-  {
-    eyebrow: 'Your turn — then',
-    title: 'Roll, walk, and act',
-    body: 'Roll your Stride, then step along the glowing paths. Where you stand decides what you can do: feed embers to a Beacon, draw embers or warmth at a Wellspring, gamble at a Shrine, or steady your flame. Dare to Press On for more — at a rising risk.',
+    eyebrow: 'Your lifeline',
+    title: 'Ember is everything',
+    body: "One resource: Ember. It is your life, your fuel, and your fire — you spend it to be Bold, and to feed the Beacons. Each round the deepening night gnaws a little away. If your Ember ever reaches zero you don't die — you become a drifting Wisp, and an ally must reach you to bring you back.",
     accent: ember,
     motif: (c) => (
       <g>
-        <rect x="22" y="44" width="32" height="32" rx="6" fill="none" stroke={c} strokeWidth="2" />
-        <circle cx="32" cy="54" r="2.5" fill={c} />
-        <circle cx="44" cy="66" r="2.5" fill={c} />
-        <path d="M58 60 h22" stroke={c} strokeWidth="2" strokeDasharray="3 4" />
-        <circle cx="92" cy="60" r="12" fill="none" stroke={c} strokeWidth="2" />
-        <circle cx="92" cy="60" r="4" fill={c} style={{ filter: `drop-shadow(0 0 6px ${c})` }} />
+        <path d={`M60 24 C 78 44 72 66 60 66 C 48 66 42 44 60 24 Z`} fill={c} opacity="0.9" style={{ filter: `drop-shadow(0 0 10px ${c})` }} />
+        <rect x="40" y="82" width="40" height="7" rx="3.5" fill="none" stroke={c} strokeWidth="1.5" opacity="0.6" />
+        <rect x="40" y="82" width="26" height="7" rx="3.5" fill={c} opacity="0.85" />
       </g>
     ),
   },
   {
-    eyebrow: 'Your turn — last',
-    title: 'End your turn — the board answers',
-    body: 'When you pass, the Gloaming plays back: the tide rises, it strikes, the Stalker steps closer. Share embers and warmth with allies on your node, and lift the fallen — alone, no one crosses. This is a game you win together.',
+    eyebrow: 'Your turn — the whole rule',
+    title: 'Roll, walk, then Brave or Steady',
+    body: 'Roll your Stride die and step along the glowing paths. Then the place you stand on reacts — and you make ONE choice. BRAVE it: a bold play that spends Ember for a bigger prize and a real risk. Or STEADY: play it safe and gather Ember. Every turn is just that. The game shows you the cost before you commit.',
     accent: glacier,
     motif: (c) => (
       <g>
-        <circle cx="44" cy="60" r="10" fill={c} opacity="0.8" />
-        <circle cx="76" cy="60" r="10" fill="var(--color-seat-1)" opacity="0.8" />
-        <path d="M54 60 h12" stroke={c} strokeWidth="2" />
-        <path d="M60 44 v32" stroke={c} strokeWidth="1.5" opacity="0.4" />
+        <rect x="18" y="46" width="30" height="30" rx="6" fill="none" stroke={c} strokeWidth="2" />
+        <circle cx="27" cy="55" r="2.4" fill={c} />
+        <circle cx="39" cy="67" r="2.4" fill={c} />
+        <path d="M52 61 h14" stroke={c} strokeWidth="2" strokeDasharray="3 4" />
+        <path d="M74 50 l12 0 0 22 -12 0" fill="none" stroke="var(--color-ember)" strokeWidth="2" />
+        <path d="M92 50 l10 0 0 22 -10 0" fill="none" stroke={c} strokeWidth="2" />
+        <text x="80" y="66" fontSize="9" fill="var(--color-ember)" textAnchor="middle" className="font-display">B</text>
+        <text x="97" y="66" fontSize="9" fill={c} textAnchor="middle" className="font-display">S</text>
       </g>
     ),
   },
   {
-    eyebrow: 'And one more thing',
-    title: 'Not everyone wants the dawn',
-    body: 'In larger parties, one of you may be secretly Marked by the Gloaming — willing the night to fall. Trust carefully. You have a single accusation to Cast Out a traitor: be right and the dark recoils; be wrong and it feasts. Now — light the dark, and cross together.',
+    eyebrow: 'The board plays back',
+    title: 'The Gloaming shows its hand',
+    body: 'After you act, the board takes its turn — and it tells you what it means to do NEXT: snuff a Beacon, thorn a road shut, wake a Stalker toward your weakest, or surge the Night. You see the blow coming — so outwit it. As the Night deepens through Dusk, the Gloaming, and Pitch, it grows bolder and faster.',
     accent: dread,
     motif: (c) => (
       <g>
-        <path d="M60 28 l8 14 16 2 -12 11 4 16 -16 -9 -16 9 4 -16 -12 -11 16 -2 z" fill="none" stroke={c} strokeWidth="2" />
-        <circle cx="60" cy="62" r="4" fill={c} style={{ filter: `drop-shadow(0 0 6px ${c})` }} />
+        <path d="M60 26 l7 12 14 2 -10 10 3 14 -14 -8 -14 8 3 -14 -10 -10 14 -2 z" fill="none" stroke={c} strokeWidth="2" />
+        <circle cx="60" cy="60" r="4.5" fill={c} style={{ filter: `drop-shadow(0 0 6px ${c})` }} />
+        <path d="M30 92 q30 -14 60 0" fill="none" stroke="var(--color-dread-bright)" strokeWidth="2" opacity="0.7" />
+      </g>
+    ),
+  },
+  {
+    eyebrow: 'Together, or not at all',
+    title: 'Carry each other into the dawn',
+    body: 'No one crosses alone. Reach a fallen ally and Rekindle their light. To win, every bearer must stand at the Threshold with all three Beacons lit — and the Gloaming will try to snuff one out just as you gather. In larger parties, one of you may be secretly Marked, willing the dark to win: you get one accusation to Cast them Out. Now — light the dark.',
+    accent: glacier,
+    motif: (c) => (
+      <g>
+        <circle cx="44" cy="60" r="10" fill={c} opacity="0.85" />
+        <circle cx="76" cy="60" r="6" fill="none" stroke="var(--color-ember)" strokeWidth="2" strokeDasharray="2 3" />
+        <circle cx="76" cy="60" r="2.5" fill="var(--color-ember)" style={{ filter: `drop-shadow(0 0 5px var(--color-ember))` }} />
+        <path d="M55 60 q10 -10 16 0" fill="none" stroke="var(--color-ember)" strokeWidth="2" />
       </g>
     ),
   },

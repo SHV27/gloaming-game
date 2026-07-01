@@ -96,9 +96,10 @@ export function SetupScreen({ onStart }: { onStart: (names: string[], opts: Star
 
         <div className="rounded-xl border border-haze/40 bg-dusk/70 p-6 backdrop-blur">
           <p className="mb-5 font-body text-[13px] leading-relaxed text-parchment/80">
-            Light the <span className="text-ember">three Beacons</span> and bring every bearer to the{' '}
-            <span className="text-ember-bright">Threshold</span> — before the{' '}
-            <span className="text-dread-bright">Dread tide</span> drowns the last of the light.
+            Spend your <span className="text-ember">Ember</span> to light the{' '}
+            <span className="text-ember">three Beacons</span>, then gather every bearer at the{' '}
+            <span className="text-ember-bright">Threshold</span> and cross — before the{' '}
+            <span className="text-dread-bright">Night</span> drowns the last of the light.
           </p>
 
           {/* count */}
