@@ -28,6 +28,8 @@ export function TopBar() {
           onClick={() => setMuted(sound.toggleMute())}
           className="flex items-center gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-1.5 font-display text-xs uppercase tracking-widest text-fog hover:text-parchment"
           title={muted ? 'Unmute' : 'Mute'}
+          aria-label={muted ? 'Unmute sound' : 'Mute sound'}
+          aria-pressed={muted}
         >
           <SpeakerIcon muted={muted} />
           {muted ? 'muted' : 'sound'}

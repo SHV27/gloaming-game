@@ -1,11 +1,64 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { BoardProps } from 'boardgame.io/react';
-import type { GState, Player } from '../game/types';
+import type { GState, Player, OmenTone, Reaction } from '../game/types';
 import { Dice } from './Dice';
 import { Button } from '../ui/Button';
 import { getReaction } from '../game/effects';
+import { eventById } from '../game/events';
+import { narrate, type Reskin } from '../game/narrator';
+import { useShell } from './shell';
 import { SEAT_COLORS, EMBER_MAX, REKINDLE_COST } from '../game/constants';
+
+const TONE_ACCENT: Record<OmenTone | 'calm', string> = {
+  gift: 'var(--color-ember)',
+  trap: 'var(--color-dread)',
+  bargain: 'var(--color-seat-2)',
+  riddle: 'var(--color-seat-3)',
+  stalker: 'var(--color-dread-bright)',
+  calm: 'var(--color-parchment-dim)',
+};
+const TONE_LABEL: Record<OmenTone | 'calm', string> = {
+  gift: 'A Gift',
+  trap: 'A Snare',
+  bargain: 'A Bargain',
+  riddle: 'A Riddle',
+  stalker: 'It Draws Near',
+  calm: 'The Place',
+};
+
+/** The Living Narrator: re-skin the omen's prose for this moment (AI on + key
+ *  present); always falls back to the hand-authored text. Only hollow/hearth
+ *  reactions carry an omen; special tiles keep their intrinsic flavour. */
+function useReskin(ai: boolean, omenId: number | null, G: GState, playerName: string) {
+  const [reskin, setReskin] = useState<Reskin | null>(null);
+  const [fetching, setFetching] = useState(false);
+  const bucket = Math.round((G.night / Math.max(1, G.nightMax)) * 4);
+  useEffect(() => {
+    setReskin(null);
+    if (!ai || omenId == null) {
+      setFetching(false);
+      return;
+    }
+    let cancelled = false;
+    setFetching(true);
+    narrate(eventById(omenId), {
+      playerName,
+      dread: G.night,
+      dreadMax: G.nightMax,
+      beaconsLit: G.beaconsLit,
+      stalker: !!G.stalker,
+      recentLog: G.log.slice(-4).map((l) => l.text),
+    })
+      .then((r) => !cancelled && setReskin(r))
+      .finally(() => !cancelled && setFetching(false));
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ai, omenId, bucket, G.beaconsLit, playerName]);
+  return { reskin, fetching };
+}
 
 const INTENT_ICON: Record<string, string> = {
   snuff: 'M4 12 Q8 4 12 12 M8 12 v-5', // a guttering flame
@@ -16,6 +69,7 @@ const INTENT_ICON: Record<string, string> = {
 
 export function TurnHud({ props, myTurn }: { props: BoardProps<GState>; myTurn: boolean }) {
   const { G, ctx, moves } = props;
+  const shell = useShell();
   const me = G.players[ctx.currentPlayer];
   const [accusing, setAccusing] = useState(false);
 
@@ -29,10 +83,20 @@ export function TurnHud({ props, myTurn }: { props: BoardProps<GState>; myTurn: 
     return () => clearTimeout(id);
   }, [myTurn, G.autoWisp, ctx.turn, ctx.gameover, moves]);
 
+  // The Living Narrator re-skins the omen prose (hollow/hearth only) when it's
+  // this seat's turn to choose. Hooks stay unconditional (before the null guard).
+  const meNode = me ? G.nodes[me.nodeId] : undefined;
+  const omenId =
+    me && meNode && (meNode.type === 'hollow' || meNode.type === 'hearth') && myTurn && G.hasRolled && !G.acted
+      ? G.turnOmen
+      : null;
+  const { reskin, fetching } = useReskin(shell.aiNarrator, omenId, G, me?.name ?? '');
+
   if (!me) return null;
 
   const canChoose = myTurn && !me.wisp && !G.autoWisp && G.hasRolled && !G.acted;
   const reaction = getReaction(G, me);
+  const braveLabel = (omenId != null && reskin?.choices?.[0]?.label) || reaction.brave.label;
   const wispAlliesHere = Object.values(G.players).filter(
     (p) => p.wisp && p.id !== me.id && p.nodeId === me.nodeId,
   );
@@ -65,7 +129,7 @@ export function TurnHud({ props, myTurn }: { props: BoardProps<GState>; myTurn: 
         </div>
 
         {/* goal — always visible (clarity: "your goal right now") */}
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1" role="status" aria-live="polite">
           <div className="font-display text-[10px] uppercase tracking-[0.3em] text-ember/60">Your goal</div>
           <div className="truncate font-body text-[13px] text-parchment/90">{goal}</div>
         </div>
@@ -122,18 +186,20 @@ export function TurnHud({ props, myTurn }: { props: BoardProps<GState>; myTurn: 
                 transition={{ duration: 0.35 }}
                 className="flex flex-col gap-2 md:flex-row md:items-stretch"
               >
-                {/* narration */}
-                <div className="min-w-0 flex-1 rounded-lg border border-white/10 bg-night/50 px-4 py-2.5">
-                  <div className="font-display text-sm text-parchment text-engraved">{reaction.title}</div>
-                  <div className="mt-0.5 font-body text-[13px] leading-snug text-parchment/75">
-                    {reaction.narration}
-                  </div>
-                </div>
+                {/* the grimoire — the place reacting, writing itself in */}
+                <Grimoire
+                  reaction={reaction}
+                  title={(omenId != null && reskin?.title) || reaction.title}
+                  narration={(omenId != null && reskin?.narration) || reaction.narration}
+                  ai={shell.aiNarrator && omenId != null}
+                  fetching={fetching}
+                  living={!!(omenId != null && reskin)}
+                />
 
                 {/* choices */}
                 <div className="flex shrink-0 gap-2">
                   <ChoiceButton
-                    label={reaction.brave.label}
+                    label={braveLabel}
                     preview={reaction.brave.preview}
                     reason={reaction.brave.reason}
                     enabled={reaction.brave.enabled}
@@ -191,6 +257,63 @@ export function TurnHud({ props, myTurn }: { props: BoardProps<GState>; myTurn: 
             )}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ── the grimoire: the place reacting, writing itself in like ink ─────────────
+function Grimoire({
+  reaction,
+  title,
+  narration,
+  ai,
+  fetching,
+  living,
+}: {
+  reaction: Reaction;
+  title: string;
+  narration: string;
+  ai: boolean;
+  fetching: boolean;
+  living: boolean;
+}) {
+  const accent = TONE_ACCENT[reaction.tone];
+  const lines = narration.split(/(?<=[.!?])\s+/).filter(Boolean);
+  return (
+    <div className="relative min-w-0 flex-1 overflow-hidden rounded-lg border border-white/10 bg-gradient-to-b from-twilight/60 to-night/60 px-4 py-2.5">
+      {/* tone seam */}
+      <div
+        className="pointer-events-none absolute inset-y-0 left-0 w-[3px]"
+        style={{ background: accent, boxShadow: `0 0 10px ${accent}` }}
+      />
+      <div className="mb-0.5 flex items-center gap-2 pl-1.5">
+        <span className="font-display text-[9px] uppercase tracking-[0.3em]" style={{ color: accent }}>
+          {TONE_LABEL[reaction.tone]}
+        </span>
+        {ai && (
+          <span
+            className="font-body text-[9px] uppercase tracking-widest"
+            style={{ color: accent, opacity: fetching ? 1 : living ? 0.75 : 0.3 }}
+            title={living ? 'Narrated by the Living Gloaming' : fetching ? 'The Gloaming finds its words…' : ''}
+          >
+            {fetching ? '✦ stirring…' : living ? '✦ living' : ''}
+          </span>
+        )}
+      </div>
+      <div className="pl-1.5 font-display text-sm text-parchment text-engraved">{title}</div>
+      <div className="mt-0.5 space-y-0.5 pl-1.5">
+        {lines.map((ln, i) => (
+          <motion.p
+            key={`${title}-${i}`}
+            initial={{ opacity: 0, filter: 'blur(4px)' }}
+            animate={{ opacity: 1, filter: 'blur(0px)' }}
+            transition={{ delay: 0.1 + i * 0.14, duration: 0.5 }}
+            className="font-body text-[13px] leading-snug text-parchment/80"
+          >
+            {ln}
+          </motion.p>
+        ))}
       </div>
     </div>
   );

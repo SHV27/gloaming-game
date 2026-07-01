@@ -171,7 +171,102 @@ function synHeartbeat(): string {
   return encodeWav(s);
 }
 
-export type Sfx = 'ui' | 'dice' | 'beacon' | 'dread' | 'dimmed' | 'stalker' | 'win' | 'lose' | 'heartbeat';
+// kindle — ember pours into a Beacon: a warm spark that catches and rises
+function synKindle(): string {
+  const s = dur(0.36);
+  for (let i = 0; i < s.length; i++) {
+    const t = i / SR;
+    const env = Math.min(1, t * 20) * Math.exp(-t * 6);
+    const rise = 220 + t * 260;
+    const spark = (Math.random() * 2 - 1) * Math.exp(-t * 30) * 0.22;
+    s[i] = (sine(t, rise) * 0.5 + sine(t, rise * 2) * 0.2 + spark) * env * 0.4;
+  }
+  return encodeWav(s);
+}
+
+// snuff — a Beacon is crushed out: a wet hiss that chokes off + a pitch collapse
+function synSnuff(): string {
+  const s = dur(0.5);
+  let lp = 0;
+  for (let i = 0; i < s.length; i++) {
+    const t = i / SR;
+    const env = Math.exp(-t * 5);
+    const hiss = Math.random() * 2 - 1;
+    lp = lp * 0.5 + hiss * 0.5;
+    const drop = sine(t, 180 - t * 150);
+    s[i] = (lp * 0.5 * Math.exp(-t * 8) + drop * 0.5) * env * 0.42;
+  }
+  return encodeWav(s);
+}
+
+// wisp — a bearer's light guts out: a mournful, airy descending mote
+function synWisp(): string {
+  const s = dur(0.9);
+  for (let i = 0; i < s.length; i++) {
+    const t = i / SR;
+    const env = Math.min(1, t * 4) * Math.exp(-t * 2.4);
+    const vib = 1 + 0.02 * sine(t, 5);
+    const air = (Math.random() * 2 - 1) * 0.12 * Math.exp(-t * 2);
+    s[i] = (sine(t, (360 - t * 120) * vib) * 0.3 + air) * env * 0.32;
+  }
+  return encodeWav(s);
+}
+
+// rekindle — an ally lifts a Wisp back: a spark + a bright rising third
+function synRekindle(): string {
+  const s = dur(0.7);
+  const notes = [329.6, 392, 523.3];
+  for (let i = 0; i < s.length; i++) {
+    const t = i / SR;
+    const env = Math.min(1, t * 12) * Math.exp(-t * 2.2);
+    let v = (Math.random() * 2 - 1) * Math.exp(-t * 40) * 0.28;
+    for (let n = 0; n < notes.length; n++) if (t > n * 0.06) v += sine(t, notes[n] * (1 + t * 0.03)) * 0.3;
+    s[i] = v * env * 0.34;
+  }
+  return encodeWav(s);
+}
+
+// surge — the Night gathers and swells UP into a hit (distinct from the dread drop)
+function synSurge(): string {
+  const s = dur(0.7);
+  for (let i = 0; i < s.length; i++) {
+    const t = i / SR;
+    const env = Math.min(1, t * 2) * Math.exp(-t * 2.2);
+    const f = 58 + t * 46;
+    const noise = (Math.random() * 2 - 1) * 0.1 * t;
+    s[i] = (sine(t, f) * 0.5 + sine(t, f * 1.5) * 0.25 + noise) * env * 0.45;
+  }
+  return encodeWav(s);
+}
+
+// act — the night deepens into a new Act: an ominous inharmonic toll
+function synAct(): string {
+  const s = dur(1.8);
+  for (let i = 0; i < s.length; i++) {
+    const t = i / SR;
+    const env = Math.exp(-t * 1.3);
+    const v = sine(t, 55) * 0.4 + sine(t, 110) * 0.5 + sine(t, 164) * 0.3 + sine(t, 220) * 0.18;
+    s[i] = v * env * 0.3;
+  }
+  return encodeWav(s);
+}
+
+export type Sfx =
+  | 'ui'
+  | 'dice'
+  | 'beacon'
+  | 'dread'
+  | 'dimmed'
+  | 'stalker'
+  | 'win'
+  | 'lose'
+  | 'heartbeat'
+  | 'kindle'
+  | 'snuff'
+  | 'wisp'
+  | 'rekindle'
+  | 'surge'
+  | 'act';
 
 const MUTE_KEY = 'gloaming.muted';
 
@@ -204,6 +299,12 @@ class SoundManager {
       win: new Howl({ src: [synWin()], volume: 0.7 }),
       lose: new Howl({ src: [synLose()], volume: 0.7 }),
       heartbeat: new Howl({ src: [synHeartbeat()], volume: 0.5 }),
+      kindle: new Howl({ src: [synKindle()], volume: 0.6 }),
+      snuff: new Howl({ src: [synSnuff()], volume: 0.8 }),
+      wisp: new Howl({ src: [synWisp()], volume: 0.6 }),
+      rekindle: new Howl({ src: [synRekindle()], volume: 0.7 }),
+      surge: new Howl({ src: [synSurge()], volume: 0.7 }),
+      act: new Howl({ src: [synAct()], volume: 0.6 }),
     };
     this.ambient = new Howl({ src: [synAmbient()], loop: true, volume: 0.0 });
     Howler.mute(this.muted);

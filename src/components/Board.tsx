@@ -119,6 +119,17 @@ export function GloamingBoard(props: BoardProps<GState>) {
     return s;
   }, [myTurn, me, G]);
 
+  // what the Gloaming has telegraphed — drawn ON the board so you see it coming
+  const telegraph = useMemo(() => {
+    const snuff = new Set<number>();
+    const seal: Array<[number, number]> = [];
+    for (const it of G.intents) {
+      if (it.kind === 'snuff' && it.beaconNodeId != null) snuff.add(it.beaconNodeId);
+      if (it.kind === 'seal' && it.edge) seal.push(it.edge);
+    }
+    return { snuff, seal };
+  }, [G.intents]);
+
   const handoffNeeded = !ctx.gameover && playerID !== ctx.currentPlayer;
 
   return (
@@ -256,6 +267,44 @@ export function GloamingBoard(props: BoardProps<GState>) {
                   onPick={() => myTurn && reachable.has(n.id) && moves.moveTo(n.id)}
                 />
               ))}
+
+              {/* the Gloaming's telegraph — dread coiling on what it means to strike */}
+              {[...telegraph.snuff].map((id) => {
+                const n = G.nodes[id];
+                return (
+                  <motion.circle
+                    key={`tg-snuff-${id}`}
+                    cx={n.x}
+                    cy={n.y}
+                    r={34}
+                    fill="none"
+                    stroke="var(--color-dread-bright)"
+                    strokeWidth={2}
+                    strokeDasharray="3 6"
+                    style={{ transformOrigin: `${n.x}px ${n.y}px`, pointerEvents: 'none' }}
+                    animate={reduce ? { opacity: 0.6 } : { opacity: [0.3, 0.85, 0.3], scale: [1, 1.08, 1], rotate: [0, 20, 0] }}
+                    transition={reduce ? undefined : { duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+                  />
+                );
+              })}
+              {telegraph.seal.map(([a, b], i) => {
+                const na = G.nodes[a];
+                const nb = G.nodes[b];
+                return (
+                  <motion.path
+                    key={`tg-seal-${a}-${b}-${i}`}
+                    d={edgePath(na.x, na.y, nb.x, nb.y, a * 17 + b)}
+                    fill="none"
+                    stroke="var(--color-dread-bright)"
+                    strokeWidth={3}
+                    strokeDasharray="5 8"
+                    strokeLinecap="round"
+                    style={{ pointerEvents: 'none' }}
+                    animate={reduce ? { opacity: 0.55 } : { opacity: [0.25, 0.7, 0.25] }}
+                    transition={reduce ? undefined : { duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+                  />
+                );
+              })}
 
               {/* player tokens */}
               {Object.values(G.players).map((p) => {

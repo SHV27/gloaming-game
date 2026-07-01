@@ -21,12 +21,20 @@ export function NightTide({
   const near = r >= 0.66;
 
   return (
-    <div className="flex h-full select-none flex-col items-center gap-2">
+    <div
+      className="flex h-full select-none flex-col items-center gap-2"
+      role="meter"
+      aria-label={`Night — ${ACT_NAMES[act]}`}
+      aria-valuemin={0}
+      aria-valuemax={nightMax}
+      aria-valuenow={night}
+      aria-valuetext={`${ACT_NAMES[act]}: ${night} of ${nightMax} toward nightfall`}
+    >
       <div className="font-display text-[10px] uppercase tracking-[0.28em] text-dread-bright/80">
         Night
       </div>
 
-      <div className="relative w-9 flex-1 overflow-hidden rounded-full border border-haze/40 bg-night/80">
+      <div className="relative w-9 flex-1 overflow-hidden rounded-full border border-haze/40 bg-night/80" aria-hidden="true">
         {/* Act boundaries */}
         {ACT_RATIOS.map((ratio, i) => (
           <div
