@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import type { GState, LogTone } from '../game/types';
-import { SEAT_COLORS } from '../game/constants';
+import { SEAT_COLORS, TORCH_MAX } from '../game/constants';
 import { Panel, PanelTitle } from '../ui/Panel';
 
 const TONE_COLOR: Record<LogTone, string> = {
@@ -41,14 +41,29 @@ export function EventLog({ G, currentPlayer }: { G: GState; currentPlayer: strin
                 >
                   {p.name}
                 </span>
-                {p.wisp && <span className="text-[10px] text-dread-bright">a Wisp</span>}
+                {p.wisp && <span className="text-[10px] text-fog">a Wisp</span>}
+                {p.carrying.length > 0 && (
+                  <span className="rounded bg-ember/20 px-1 text-[9px] font-display text-ember-bright" title="carrying a Lantern">
+                    ◈{p.carrying.length > 1 ? `×${p.carrying.length}` : ''}
+                  </span>
+                )}
               </span>
-              <span className="font-display text-[11px] text-fog">
+              <span className="font-display text-[11px] text-fog" aria-label={p.wisp ? 'torch out' : `torch ${p.torch} of ${TORCH_MAX}`}>
                 {p.wisp ? (
                   <span className="text-fog-dim italic">drifting…</span>
                 ) : (
-                  <span className="text-ember-bright" title={`${p.ember} Ember`}>
-                    {'✦'.repeat(Math.min(p.ember, 8)) || '·'}
+                  <span className="flex items-center gap-0.5">
+                    {Array.from({ length: TORCH_MAX }).map((_, i) => (
+                      <span
+                        key={i}
+                        className="inline-block h-2.5 w-1 rounded-full"
+                        style={{
+                          background: i < p.torch ? 'var(--color-ember)' : 'var(--color-night)',
+                          boxShadow: i < p.torch ? '0 0 4px var(--color-ember)' : undefined,
+                          opacity: i < p.torch ? 1 : 0.4,
+                        }}
+                      />
+                    ))}
                   </span>
                 )}
               </span>

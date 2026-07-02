@@ -4,7 +4,7 @@
 import puppeteer from 'puppeteer-core';
 
 const CHROME = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-const URL = process.argv[2] || 'https://gloaming-murex.vercel.app';
+const URL = process.argv[2] || 'http://localhost:5173/';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const errors = [];
@@ -40,23 +40,35 @@ await page.goto(URL, { waitUntil: 'networkidle2', timeout: 45000 });
 await sleep(1200);
 await click('skip');            // dismiss tutorial
 await sleep(500);
-await click('into the dusk');   // start a 3p (default) game
+await click('into the dusk');   // start a 2p (default) game
 await sleep(1800);
 await click('reveal my turn');  // handoff
 await sleep(700);
 await click('begin');
 await sleep(900);
-await click('roll stride');     // exercise a move
-await sleep(1600);
-// take the first action button if present (Steady is always there)
-await page.evaluate(() => {
-  const b = [...document.querySelectorAll('button')].find((x) => /steady/i.test(x.textContent));
-  b?.click();
-});
-await sleep(1500);
+// play a few full turns to exercise the dark, the Nightmare, an event, movement
+for (let t = 0; t < 5; t++) {
+  await click('roll to move');
+  await sleep(900);
+  await page.evaluate(() => {
+    const n = document.querySelector('svg [role=button]');
+    if (n) n.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  });
+  await sleep(700);
+  await page.evaluate(() => {
+    const b = [...document.querySelectorAll('button')].find((x) => /^③|end turn|grab|deliver|warm|relight|step through/i.test(x.textContent.trim()));
+    b?.click();
+  });
+  await sleep(700);
+  await click('reveal my turn');
+  await sleep(300);
+  await click('begin');
+  await sleep(400);
+}
+await sleep(800);
 
-// ignore benign noise (favicon, the expected keyless /api/narrate 404s)
-const benign = /favicon|api\/narrate|net::ERR_ABORTED.*narrate/i;
+// ignore benign noise (favicon only — the AI narrator is gone)
+const benign = /favicon/i;
 const realErrors = errors.filter((e) => !benign.test(e));
 
 await browser.close();

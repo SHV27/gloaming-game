@@ -6,7 +6,6 @@ import { createContext, useContext } from 'react';
  */
 export interface ShellApi {
   names: string[];
-  aiNarrator: boolean;
   /** Advance the on-device seat to `seat` once the handoff is acknowledged. */
   gotoSeat: (seat: string) => void;
   restart: () => void;

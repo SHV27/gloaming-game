@@ -11,15 +11,15 @@ import type { Act } from './types';
 export const STRIDE_DIE = 6; // the movement die
 
 // ── The Torch: your life, a flame with notches ──────────────────────────────
-export const TORCH_START = 7;
-export const TORCH_MAX = 7;
+export const TORCH_START = 8;
+export const TORCH_MAX = 8;
 /** The night burns one notch off the active bearer's torch each round. */
 export const TORCH_BURN_PER_ROUND = 1;
 /** Extra torch spent to step INTO a frayed tile (the dark's cold edge). */
 export const MOVE_DARK_COST = 1;
 /** Torch snuffed when the Nightmare catches you / the dark knocks you inward. */
 export const DARK_KNOCK = 2;
-export const NIGHTMARE_SNUFF = 2;
+export const NIGHTMARE_SNUFF = 1;
 
 // ── Relight (fellowship — the softlock cure + rescue drama) ──────────────────
 /** Torch a Relit ally comes back with. Relighting is free (presence is the cost). */
@@ -34,19 +34,19 @@ export const MIN_STRIDE = 1; // never fully immobilised by carrying
 // ── The Dark: how many frontier tiles it eats each round, by Act (may be fractional;
 //    the reducer accumulates it and resolves whole tiles). Accelerates each Act.
 export function darkBiteFor(act: Act, numPlayers: number): number {
-  const base = [1.9, 2.9, 3.9][act];
-  const byTable = numPlayers === 2 ? 0.92 : numPlayers >= 5 ? 1.18 : numPlayers >= 4 ? 1.07 : 1.0;
+  const base = [2.7, 3.7, 4.7][act];
+  const byTable = numPlayers === 2 ? 0.9 : numPlayers >= 5 ? 1.18 : numPlayers >= 4 ? 1.06 : 0.98;
   return base * byTable; // 2p gentler; big tables eat faster (they have more hands)
 }
 /** Delivered Lanterns are a growing light at the Gate that holds the dark back a
  *  little — rewards delivery and makes the climactic final gather winnable. */
 export function darkSlowdownFor(delivered: number): number {
-  return Math.max(0.68, 1 - 0.11 * delivered); // 0→1.0, 3→0.68
+  return Math.max(0.74, 1 - 0.09 * delivered); // 0→1.0, 3→0.74
 }
 
 // ── The Nightmare: steps toward the nearest torch each round, by Act ──────────
 export function nightmareStepsFor(act: Act): number {
-  return [1, 2, 3][act];
+  return [1, 1.5, 2][act];
 }
 
 // ── The three Acts — read off the deepest surviving ring (PLAN §D) ───────────

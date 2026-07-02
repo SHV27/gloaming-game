@@ -10,7 +10,6 @@ const MIN_MARKED = 4; // the Marked is offered at 4+ seats
 
 export interface StartOpts {
   marked: boolean;
-  ai: boolean;
 }
 
 // Seeded organic ember scatter (no diagonal lattice).
@@ -33,10 +32,9 @@ const EMBERS = (() => {
 })();
 
 export function SetupScreen({ onStart }: { onStart: (names: string[], opts: StartOpts) => void }) {
-  const [count, setCount] = useState(3);
+  const [count, setCount] = useState(2);
   const [names, setNames] = useState<string[]>(SEAT_NAMES.slice(0, MAX).map((n) => n));
   const [marked, setMarked] = useState(false);
-  const [ai, setAi] = useState(false);
   const [showTut, setShowTut] = useState(!tutorialSeen());
 
   const markedAvailable = count >= MIN_MARKED;
@@ -50,7 +48,7 @@ export function SetupScreen({ onStart }: { onStart: (names: string[], opts: Star
     sound.init();
     sound.play('beacon');
     const roster = Array.from({ length: count }, (_, i) => names[i]?.trim() || SEAT_NAMES[i]);
-    onStart(roster, { marked: marked && markedAvailable, ai });
+    onStart(roster, { marked: marked && markedAvailable });
   };
 
   return (
@@ -90,16 +88,17 @@ export function SetupScreen({ onStart }: { onStart: (names: string[], opts: Star
             GLOAMING
           </h1>
           <p className="mt-2 font-body text-sm italic tracking-wide text-fog">
-            The board that plays back.
+            Trapped inside. Get everyone out.
           </p>
         </div>
 
         <div className="rounded-xl border border-haze/40 bg-dusk/70 p-6 backdrop-blur">
           <p className="mb-5 font-body text-[13px] leading-relaxed text-parchment/80">
-            Spend your <span className="text-ember">Ember</span> to light the{' '}
-            <span className="text-ember">three Beacons</span>, then gather every bearer at the{' '}
-            <span className="text-ember-bright">Threshold</span> and cross — before the{' '}
-            <span className="text-dread-bright">Night</span> drowns the last of the light.
+            The <span className="text-dread-bright">dark</span> eats the board from the edges in. Carry the{' '}
+            <span className="text-ember">three Lanterns</span> to the{' '}
+            <span className="text-ember-bright">Gate</span> and get everyone out together — before the dark reaches
+            the middle. Don't let your <span className="text-ember">torch</span> go out. Don't get caught. Don't leave
+            anyone behind.
           </p>
 
           {/* count */}
@@ -160,13 +159,6 @@ export function SetupScreen({ onStart }: { onStart: (names: string[], opts: Star
               label="The Marked walks among you"
               hint={markedAvailable ? 'One bearer secretly serves the dark.' : 'Needs 4+ bearers.'}
               tone="dread"
-            />
-            <Toggle
-              on={ai}
-              onClick={() => setAi((v) => !v)}
-              label="Living Narrator (AI)"
-              hint="The Gloaming tells its own story. Falls back to the deck with no key."
-              tone="ember"
             />
           </div>
 

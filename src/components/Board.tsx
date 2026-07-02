@@ -3,9 +3,9 @@ import { motion, AnimatePresence, useAnimationControls, useReducedMotion } from 
 import type { BoardProps } from 'boardgame.io/react';
 import type { GState, BoardNode } from '../game/types';
 import { BOARD_W, BOARD_H, EDGES } from '../game/board';
-import { SEAT_COLORS } from '../game/constants';
-import { isSealed, strideCostFor } from '../game/effects';
-import { nightFilter, NightTide } from './DreadTide';
+import { SEAT_COLORS, TORCH_MAX, LANTERN_COUNT } from '../game/constants';
+import { reachable as reachableWithin, isVoid, lanternOnNode } from '../game/effects';
+import { boardFilter, DarkColumn } from './DreadTide';
 import { TurnHud } from './TurnHud';
 import { EventLog } from './EventLog';
 import { HandoffScreen } from './HandoffScreen';
@@ -17,24 +17,6 @@ import { useGameSound } from '../hooks/useGameSound';
 import { sound } from '../audio/sound';
 import { useShell } from './shell';
 
-const NODE_GRAD: Record<BoardNode['type'], string> = {
-  hearth: 'url(#nd-hearth)',
-  hollow: 'url(#nd-hollow)',
-  wellspring: 'url(#nd-wellspring)',
-  shrine: 'url(#nd-shrine)',
-  beacon: 'url(#nd-beacon)',
-  threshold: 'url(#nd-threshold)',
-};
-
-const NODE_GLOW: Record<BoardNode['type'], string> = {
-  hearth: 'var(--color-ember)',
-  hollow: 'transparent',
-  wellspring: 'var(--color-glow-well)',
-  shrine: 'var(--color-glow-shrine)',
-  beacon: 'var(--color-ember)',
-  threshold: 'var(--color-seat-3)',
-};
-
 /** A gently curved path between two nodes so routes feel walked, not plotted. */
 function edgePath(ax: number, ay: number, bx: number, by: number, seed: number): string {
   const mx = (ax + bx) / 2;
@@ -42,10 +24,37 @@ function edgePath(ax: number, ay: number, bx: number, by: number, seed: number):
   const dx = bx - ax;
   const dy = by - ay;
   const len = Math.hypot(dx, dy) || 1;
-  const off = (seed % 2 ? 1 : -1) * Math.min(26, len * 0.09);
+  const off = (seed % 2 ? 1 : -1) * Math.min(20, len * 0.07);
   const cx = mx + (-dy / len) * off;
   const cy = my + (dx / len) * off;
   return `M ${ax} ${ay} Q ${cx} ${cy} ${bx} ${by}`;
+}
+
+/** BFS path (list of steps after `from`) over surviving tiles toward `to`. */
+function pathTo(G: GState, from: number, to: number): number[] {
+  if (from === to) return [];
+  const prev = new Map<number, number>();
+  const seen = new Set([from]);
+  const q = [from];
+  while (q.length) {
+    const cur = q.shift()!;
+    for (const n of G.nodes[cur].neighbors) {
+      if (seen.has(n) || isVoid(G, n)) continue;
+      seen.add(n);
+      prev.set(n, cur);
+      if (n === to) {
+        const out: number[] = [];
+        let x: number | undefined = to;
+        while (x !== undefined && x !== from) {
+          out.unshift(x);
+          x = prev.get(x);
+        }
+        return out;
+      }
+      q.push(n);
+    }
+  }
+  return [];
 }
 
 export function GloamingBoard(props: BoardProps<GState>) {
@@ -55,9 +64,10 @@ export function GloamingBoard(props: BoardProps<GState>) {
 
   const shake = useAnimationControls();
   const lastStrike = useRef(-1);
+  const reduce = !!useReducedMotion();
 
-  // tapered board shake when the Gloaming lands a blow (RESEARCH §4)
-  const IMPACT = new Set(['snuff', 'surge', 'stalker', 'act-change']);
+  // tapered board shake when the dark bites / the Nightmare strikes / an Act turns
+  const IMPACT = new Set(['dark-eat', 'nightmare', 'snuff', 'act-change']);
   useEffect(() => {
     if (!G.flash || !IMPACT.has(G.flash.kind)) return;
     if (G.flash.nonce === lastStrike.current) return;
@@ -73,27 +83,27 @@ export function GloamingBoard(props: BoardProps<GState>) {
 
   const myTurn = playerID === ctx.currentPlayer && !ctx.gameover;
   const me = playerID ? G.players[playerID] : undefined;
-  const reduce = !!useReducedMotion();
-  const nightRatio = Math.min(1, G.night / G.nightMax);
+  const total = G.nodes.length;
+  const darkRatio = Math.min(1, G.dark.length / total);
 
   // win/lose sting (once)
   const stungRef = useRef(false);
   useEffect(() => {
     if (ctx.gameover && !stungRef.current) {
       stungRef.current = true;
-      sound.play(ctx.gameover.winner === 'lanternbearers' ? 'win' : 'lose');
+      sound.play(ctx.gameover.winner === 'bearers' ? 'win' : 'lose');
     }
   }, [ctx.gameover]);
 
-  // the Dread heartbeat — quickens as night nears (only once it's felt)
+  // dread heartbeat quickens as the dark nears the center
   useEffect(() => {
-    if (reduce || ctx.gameover || nightRatio < 0.42) return;
-    const interval = Math.max(680, 1850 - nightRatio * 1250);
+    if (reduce || ctx.gameover || darkRatio < 0.45) return;
+    const interval = Math.max(680, 1850 - darkRatio * 1250);
     const id = setInterval(() => sound.play('heartbeat'), interval);
     return () => clearInterval(id);
-  }, [nightRatio, reduce, ctx.gameover]);
+  }, [darkRatio, reduce, ctx.gameover]);
 
-  // The Marked's private one-time reveal (after handoff; never the prev player).
+  // The Marked's private one-time reveal (dormant scaffolding; never the prev player).
   const [ackedMarked, setAckedMarked] = useState<Record<string, boolean>>({});
   const showRoleReveal = myTurn && me?.role === 'marked' && !!playerID && !ackedMarked[playerID];
 
@@ -108,27 +118,16 @@ export function GloamingBoard(props: BoardProps<GState>) {
     return m;
   }, [G.players]);
 
-  // which neighbors the active player can reach right now
+  // tiles the active bearer can reach right now (the gold glow)
   const reachable = useMemo(() => {
-    const s = new Set<number>();
-    if (!myTurn || !me || me.wisp || G.autoWisp || !G.hasRolled || G.acted) return s;
-    const cur = G.nodes[me.nodeId];
-    for (const n of cur.neighbors) {
-      if (G.stride >= strideCostFor(G, me.nodeId, n)) s.add(n);
-    }
-    return s;
+    if (!myTurn || !me || me.wisp || G.autoWisp || !G.hasRolled || G.acted) return new Set<number>();
+    return reachableWithin(G, me.nodeId, G.stride);
   }, [myTurn, me, G]);
 
-  // what the Gloaming has telegraphed — drawn ON the board so you see it coming
-  const telegraph = useMemo(() => {
-    const snuff = new Set<number>();
-    const seal: Array<[number, number]> = [];
-    for (const it of G.intents) {
-      if (it.kind === 'snuff' && it.beaconNodeId != null) snuff.add(it.beaconNodeId);
-      if (it.kind === 'seal' && it.edge) seal.push(it.edge);
-    }
-    return { snuff, seal };
-  }, [G.intents]);
+  const walkTo = (nodeId: number) => {
+    if (!myTurn || !me || !reachable.has(nodeId)) return;
+    for (const step of pathTo(G, me.nodeId, nodeId)) moves.moveTo(step);
+  };
 
   const handoffNeeded = !ctx.gameover && playerID !== ctx.currentPlayer;
 
@@ -137,58 +136,37 @@ export function GloamingBoard(props: BoardProps<GState>) {
       <TopBar />
 
       <div className="flex min-h-0 flex-1 gap-3 px-3 pb-2">
-        {/* Night tide */}
-        <div className="w-14 py-2">
-          <NightTide night={G.night} nightMax={G.nightMax} act={G.act} />
+        {/* the dark gauge */}
+        <div className="w-12 py-2">
+          <DarkColumn eaten={G.dark.length} total={total} act={G.act} />
         </div>
 
-        {/* Board */}
+        {/* the board */}
         <div className="relative flex min-w-0 flex-1 items-center justify-center">
           <motion.div animate={shake} className="relative h-full w-full">
             <svg
               viewBox={`0 0 ${BOARD_W} ${BOARD_H}`}
               className="h-full w-full"
-              style={{ filter: nightFilter(G.night, G.nightMax), transition: 'filter 900ms ease' }}
+              style={{ filter: boardFilter(G.dark.length, total), transition: 'filter 900ms ease' }}
             >
               <defs>
-                <radialGradient id="vign" cx="50%" cy="42%" r="75%">
-                  <stop offset="55%" stopColor="var(--color-night)" stopOpacity="0" />
-                  <stop offset="100%" stopColor="var(--color-void)" stopOpacity="0.92" />
-                </radialGradient>
-                {/* per-type node materials: a pool of light inside a dark rim */}
-                <radialGradient id="nd-hollow" cx="42%" cy="38%" r="70%">
+                <radialGradient id="nd-tile" cx="42%" cy="38%" r="72%">
                   <stop offset="0%" stopColor="var(--color-node-hollow-core)" />
                   <stop offset="100%" stopColor="var(--color-node-hollow-rim)" />
                 </radialGradient>
-                <radialGradient id="nd-wellspring" cx="42%" cy="38%" r="72%">
-                  <stop offset="0%" stopColor="var(--color-glow-well)" stopOpacity="0.35" />
-                  <stop offset="55%" stopColor="#13343a" />
-                  <stop offset="100%" stopColor="var(--color-node-hollow-rim)" />
-                </radialGradient>
-                <radialGradient id="nd-shrine" cx="42%" cy="38%" r="72%">
-                  <stop offset="0%" stopColor="var(--color-glow-shrine)" stopOpacity="0.35" />
-                  <stop offset="55%" stopColor="#251a3a" />
-                  <stop offset="100%" stopColor="var(--color-node-hollow-rim)" />
-                </radialGradient>
-                <radialGradient id="nd-hearth" cx="42%" cy="38%" r="72%">
-                  <stop offset="0%" stopColor="var(--color-ember-bright)" stopOpacity="0.5" />
-                  <stop offset="55%" stopColor="var(--color-node-hearth-core)" />
-                  <stop offset="100%" stopColor="#1c130a" />
-                </radialGradient>
-                <radialGradient id="nd-beacon" cx="42%" cy="38%" r="75%">
-                  <stop offset="0%" stopColor="var(--color-ember)" stopOpacity="0.4" />
-                  <stop offset="55%" stopColor="var(--color-node-hearth-core)" />
-                  <stop offset="100%" stopColor="#160f08" />
-                </radialGradient>
-                <radialGradient id="nd-beacon-lit" cx="42%" cy="38%" r="80%">
+                <radialGradient id="nd-gate" cx="42%" cy="38%" r="78%">
                   <stop offset="0%" stopColor="var(--color-ember-glow)" />
                   <stop offset="45%" stopColor="var(--color-ember)" />
                   <stop offset="100%" stopColor="var(--color-ember-deep)" />
                 </radialGradient>
-                <radialGradient id="nd-threshold" cx="42%" cy="38%" r="75%">
-                  <stop offset="0%" stopColor="var(--color-seat-3)" stopOpacity="0.4" />
-                  <stop offset="55%" stopColor="#241f3e" />
-                  <stop offset="100%" stopColor="var(--color-node-hollow-rim)" />
+                <radialGradient id="nd-void" cx="50%" cy="50%" r="70%">
+                  <stop offset="0%" stopColor="#0a0710" />
+                  <stop offset="70%" stopColor="var(--color-void)" />
+                  <stop offset="100%" stopColor="#000" />
+                </radialGradient>
+                <radialGradient id="lantern-glow" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stopColor="var(--color-ember-bright)" />
+                  <stop offset="100%" stopColor="var(--color-ember)" stopOpacity="0" />
                 </radialGradient>
                 <filter id="soft" x="-80%" y="-80%" width="260%" height="260%">
                   <feGaussianBlur stdDeviation="7" result="b" />
@@ -199,10 +177,9 @@ export function GloamingBoard(props: BoardProps<GState>) {
                 </filter>
               </defs>
 
-              {/* the world the board sits in */}
-              <Atmosphere ratio={nightRatio} reduce={reduce} />
+              <Atmosphere ratio={darkRatio} reduce={reduce} />
 
-              {/* lantern-light each bearer casts on the dark (a Wisp's gutters low) */}
+              {/* torch-light each bearer casts (a Wisp's gutters low) */}
               {Object.values(G.players).map((p) => {
                 const node = G.nodes[p.nodeId];
                 return (
@@ -210,48 +187,30 @@ export function GloamingBoard(props: BoardProps<GState>) {
                     key={`ll-${p.id}`}
                     cx={node.x}
                     cy={node.y}
-                    r={p.wisp ? 14 : 42}
+                    r={p.wisp ? 14 : 20 + (p.torch / TORCH_MAX) * 26}
                     fill={SEAT_COLORS[p.seat]}
-                    opacity={p.wisp ? 0.04 : 0.1}
+                    opacity={p.wisp ? 0.04 : 0.09}
                     style={{ filter: 'url(#soft)', transition: 'r 600ms ease, opacity 600ms ease' }}
                   />
                 );
               })}
 
-              {/* edges — hand-walked curves, not plotted lines */}
+              {/* edges — dead if either end is void */}
               {EDGES.map(([a, b]) => {
                 const na = G.nodes[a];
                 const nb = G.nodes[b];
-                const sealed = isSealed(G, a, b);
+                const dead = isVoid(G, a) || isVoid(G, b);
                 const lit = !!me && ((me.nodeId === a && reachable.has(b)) || (me.nodeId === b && reachable.has(a)));
                 const d = edgePath(na.x, na.y, nb.x, nb.y, a * 17 + b);
-                if (sealed) {
-                  return (
-                    <g key={`${a}-${b}`}>
-                      <path d={d} fill="none" stroke="var(--color-dread-deep)" strokeWidth={7} strokeOpacity={0.35} strokeLinecap="round" />
-                      <path
-                        d={d}
-                        fill="none"
-                        stroke="var(--color-dread)"
-                        strokeWidth={3}
-                        strokeLinecap="round"
-                        strokeDasharray="2 9"
-                        style={{ filter: 'drop-shadow(0 0 5px var(--color-dread))' }}
-                      >
-                        <animate attributeName="stroke-dashoffset" from="0" to="22" dur="2.6s" repeatCount="indefinite" />
-                      </path>
-                    </g>
-                  );
-                }
                 return (
                   <path
                     key={`${a}-${b}`}
                     d={d}
                     fill="none"
-                    stroke={lit ? 'var(--color-ember)' : 'var(--color-edge)'}
+                    stroke={dead ? 'var(--color-void)' : lit ? 'var(--color-ember)' : 'var(--color-edge)'}
                     strokeWidth={lit ? 3 : 2}
                     strokeLinecap="round"
-                    strokeOpacity={lit ? 0.95 : 0.55}
+                    strokeOpacity={dead ? 0.25 : lit ? 0.95 : 0.5}
                     style={lit ? { filter: 'drop-shadow(0 0 4px var(--color-ember))' } : undefined}
                   />
                 );
@@ -264,54 +223,22 @@ export function GloamingBoard(props: BoardProps<GState>) {
                   node={n}
                   G={G}
                   reachable={reachable.has(n.id)}
-                  onPick={() => myTurn && reachable.has(n.id) && moves.moveTo(n.id)}
+                  reduce={reduce}
+                  onPick={() => walkTo(n.id)}
                 />
               ))}
 
-              {/* the Gloaming's telegraph — dread coiling on what it means to strike */}
-              {[...telegraph.snuff].map((id) => {
-                const n = G.nodes[id];
-                return (
-                  <motion.circle
-                    key={`tg-snuff-${id}`}
-                    cx={n.x}
-                    cy={n.y}
-                    r={34}
-                    fill="none"
-                    stroke="var(--color-dread-bright)"
-                    strokeWidth={2}
-                    strokeDasharray="3 6"
-                    style={{ transformOrigin: `${n.x}px ${n.y}px`, pointerEvents: 'none' }}
-                    animate={reduce ? { opacity: 0.6 } : { opacity: [0.3, 0.85, 0.3], scale: [1, 1.08, 1], rotate: [0, 20, 0] }}
-                    transition={reduce ? undefined : { duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
-                  />
-                );
-              })}
-              {telegraph.seal.map(([a, b], i) => {
-                const na = G.nodes[a];
-                const nb = G.nodes[b];
-                return (
-                  <motion.path
-                    key={`tg-seal-${a}-${b}-${i}`}
-                    d={edgePath(na.x, na.y, nb.x, nb.y, a * 17 + b)}
-                    fill="none"
-                    stroke="var(--color-dread-bright)"
-                    strokeWidth={3}
-                    strokeDasharray="5 8"
-                    strokeLinecap="round"
-                    style={{ pointerEvents: 'none' }}
-                    animate={reduce ? { opacity: 0.55 } : { opacity: [0.25, 0.7, 0.25] }}
-                    transition={reduce ? undefined : { duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
-                  />
-                );
-              })}
+              {/* the Nightmare's telegraphed next footfall */}
+              {G.nightmare.nextNodeId != null && !isVoid(G, G.nightmare.nextNodeId) && (
+                <Footprint x={G.nodes[G.nightmare.nextNodeId].x} y={G.nodes[G.nightmare.nextNodeId].y} reduce={reduce} />
+              )}
 
               {/* player tokens */}
               {Object.values(G.players).map((p) => {
                 const node = G.nodes[p.nodeId];
                 const group = byNode.get(p.nodeId) ?? [p.id];
                 const idx = group.indexOf(p.id);
-                const fan = group.length > 1 ? 17 + group.length * 4 : 0;
+                const fan = group.length > 1 ? 18 + group.length * 4 : 0;
                 const angle = (idx / Math.max(1, group.length)) * Math.PI * 2 - Math.PI / 2;
                 const ox = fan ? Math.cos(angle) * fan : 0;
                 const oy = fan ? Math.sin(angle) * fan : 0;
@@ -322,6 +249,8 @@ export function GloamingBoard(props: BoardProps<GState>) {
                     y={node.y + oy}
                     color={SEAT_COLORS[p.seat]}
                     name={p.name}
+                    torch={p.torch}
+                    carrying={p.carrying.length}
                     showName={group.length <= 2 || p.id === ctx.currentPlayer}
                     wisp={p.wisp}
                     isCurrent={p.id === ctx.currentPlayer}
@@ -329,59 +258,38 @@ export function GloamingBoard(props: BoardProps<GState>) {
                 );
               })}
 
-              {/* the Stalker */}
-              {G.stalker && (
-                <StalkerToken x={G.nodes[G.stalker.nodeId].x} y={G.nodes[G.stalker.nodeId].y} />
-              )}
-
-              <rect
-                x={0}
-                y={0}
-                width={BOARD_W}
-                height={BOARD_H}
-                fill="url(#vign)"
-                pointerEvents="none"
-              />
+              {/* the Nightmare */}
+              <NightmareToken x={G.nodes[G.nightmare.nodeId].x} y={G.nodes[G.nightmare.nodeId].y} reduce={reduce} />
             </svg>
           </motion.div>
 
-          {/* Dread veil — the night closing in, with a heartbeat that quickens */}
+          {/* the void veil — the dark closing in, heartbeat that quickens */}
           <div className="pointer-events-none absolute inset-0 overflow-hidden">
-            <div
-              className="absolute inset-0"
-              style={{
-                background: 'radial-gradient(125% 95% at 50% 38%, transparent 32%, var(--color-void) 100%)',
-                opacity: 0.16 + nightRatio * 0.55,
-                transition: 'opacity 900ms ease',
-              }}
-            />
             <motion.div
               className="absolute inset-0"
-              style={{ boxShadow: 'inset 0 0 170px 36px var(--color-dread-deep)' }}
+              style={{ boxShadow: 'inset 0 0 220px 60px var(--color-void)' }}
               animate={
                 reduce
-                  ? { opacity: nightRatio * 0.4 }
-                  : { opacity: [nightRatio * 0.16, nightRatio * 0.52, nightRatio * 0.16] }
+                  ? { opacity: 0.3 + darkRatio * 0.5 }
+                  : { opacity: [0.3 + darkRatio * 0.3, 0.3 + darkRatio * 0.6, 0.3 + darkRatio * 0.3] }
               }
               transition={
-                reduce
-                  ? undefined
-                  : { duration: Math.max(0.62, 2.3 - nightRatio * 1.5), repeat: Infinity, ease: 'easeInOut' }
+                reduce ? undefined : { duration: Math.max(0.62, 2.3 - darkRatio * 1.5), repeat: Infinity, ease: 'easeInOut' }
               }
             />
           </div>
         </div>
 
-        {/* Log + roster */}
+        {/* log + roster */}
         <div className="hidden w-72 shrink-0 py-2 lg:block">
           <EventLog G={G} currentPlayer={ctx.currentPlayer} />
         </div>
       </div>
 
       {/* HUD */}
-      <TurnHud props={props} myTurn={myTurn} />
+      <TurnHud props={props} myTurn={myTurn} onWalk={walkTo} reachableCount={reachable.size} />
 
-      {/* Hotseat handoff */}
+      {/* hotseat handoff */}
       <AnimatePresence>
         {handoffNeeded && (
           <HandoffScreen
@@ -392,17 +300,14 @@ export function GloamingBoard(props: BoardProps<GState>) {
         )}
       </AnimatePresence>
 
-      {/* The Marked's private reveal */}
+      {/* the Marked's private reveal (dormant) */}
       <AnimatePresence>
         {showRoleReveal && me && (
-          <RoleReveal
-            name={me.name}
-            onDismiss={() => setAckedMarked((s) => ({ ...s, [playerID!]: true }))}
-          />
+          <RoleReveal name={me.name} onDismiss={() => setAckedMarked((s) => ({ ...s, [playerID!]: true }))} />
         )}
       </AnimatePresence>
 
-      {/* Game over */}
+      {/* game over */}
       <AnimatePresence>
         {ctx.gameover && <GameOver gameover={ctx.gameover} G={G} onRestart={shell.restart} />}
       </AnimatePresence>
@@ -410,76 +315,107 @@ export function GloamingBoard(props: BoardProps<GState>) {
   );
 }
 
-// ── the Stalker ──────────────────────────────────────────────────────────────
-function StalkerToken({ x, y }: { x: number; y: number }) {
+// ── the Nightmare ─────────────────────────────────────────────────────────────
+function NightmareToken({ x, y, reduce }: { x: number; y: number; reduce: boolean }) {
   return (
-    <motion.g
-      initial={false}
-      animate={{ x, y }}
-      transition={{ type: 'tween', duration: 0.7, ease: 'easeInOut' }}
-    >
+    <motion.g initial={false} animate={{ x, y }} transition={{ type: 'tween', duration: 0.7, ease: 'easeInOut' }}>
+      {/* NB: animate the scale TRANSFORM, never the r ATTRIBUTE (framer emits r=undefined otherwise) */}
       <motion.circle
+        r={22}
         fill="var(--color-dread)"
         filter="url(#soft)"
-        animate={{ r: [18, 24, 18], opacity: [0.2, 0.42, 0.2] }}
-        transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+        animate={reduce ? { scale: 1, opacity: 0.32 } : { scale: [0.82, 1.18, 0.82], opacity: [0.2, 0.44, 0.2] }}
+        transition={reduce ? undefined : { duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+        style={{ transformOrigin: '0px 0px' }}
       />
-      {/* ragged dark body */}
       <path
-        d="M0,-15 L6,-4 L14,-2 L7,5 L9,15 L0,9 L-9,15 L-7,5 L-14,-2 L-6,-4 Z"
+        d="M0,-17 L7,-4 L16,-2 L8,6 L10,17 L0,10 L-10,17 L-8,6 L-16,-2 L-7,-4 Z"
         fill="var(--color-void)"
         stroke="var(--color-dread)"
-        strokeWidth={1.5}
+        strokeWidth={1.6}
         strokeLinejoin="round"
       />
-      {/* the eye */}
       <motion.circle
-        r={3.4}
+        r={3.6}
         cy={-2}
         fill="var(--color-dread-bright)"
-        animate={{ opacity: [1, 0.4, 1] }}
-        transition={{ duration: 1.4, repeat: Infinity }}
-        style={{ filter: 'drop-shadow(0 0 5px var(--color-dread-bright))' }}
+        animate={reduce ? undefined : { opacity: [1, 0.35, 1] }}
+        transition={reduce ? undefined : { duration: 1.4, repeat: Infinity }}
+        style={{ filter: 'drop-shadow(0 0 6px var(--color-dread-bright))' }}
       />
     </motion.g>
   );
 }
 
-// ── one node on the map ──────────────────────────────────────────────────────
+function Footprint({ x, y, reduce }: { x: number; y: number; reduce: boolean }) {
+  return (
+    <motion.g style={{ pointerEvents: 'none' }} initial={false} animate={{ x, y }} transition={{ duration: 0.6 }}>
+      <motion.circle
+        r={17}
+        fill="none"
+        stroke="var(--color-dread-bright)"
+        strokeWidth={2}
+        strokeDasharray="3 6"
+        animate={reduce ? { opacity: 0.6 } : { opacity: [0.25, 0.8, 0.25], scale: [0.92, 1.06, 0.92] }}
+        transition={reduce ? undefined : { duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+        style={{ transformOrigin: '0px 0px' }}
+      />
+    </motion.g>
+  );
+}
+
+// ── one tile on the map ───────────────────────────────────────────────────────
 function NodeView({
   node,
   G,
   reachable,
+  reduce,
   onPick,
 }: {
   node: BoardNode;
   G: GState;
   reachable: boolean;
+  reduce: boolean;
   onPick: () => void;
 }) {
-  const beacon = node.type === 'beacon' ? G.beacons.find((b) => b.nodeId === node.id) : undefined;
-  const isThreshold = node.type === 'threshold';
-  const sealed = isThreshold && G.beaconsLit < 3;
-  const radius = node.type === 'beacon' || isThreshold ? 26 : 18;
-  const special = node.type !== 'hollow';
-  const glow = NODE_GLOW[node.type];
-  const showGlow = special && (node.type !== 'beacon' || beacon?.lit);
+  const isGate = node.type === 'gate';
+  const eaten = isVoid(G, node.id);
+  const fraying = !eaten && G.fraying.includes(node.id);
+  const radius = isGate ? 26 : 17;
+  const lantern = lanternOnNode(G, node.id);
+  const delivered = isGate ? G.lanternsDelivered : 0;
+  const gateReady = isGate && G.lanternsDelivered >= LANTERN_COUNT;
+
+  if (eaten) {
+    // a tile the dark has swallowed — a jagged hole, not a stone
+    return (
+      <motion.g style={{ pointerEvents: 'none' }} initial={{ opacity: 0.2 }} animate={{ opacity: 1 }} transition={{ duration: 0.6 }}>
+        <circle cx={node.x} cy={node.y} r={radius + 3} fill="url(#nd-void)" />
+        <circle cx={node.x} cy={node.y} r={radius + 3} fill="none" stroke="var(--color-dread-deep)" strokeWidth={1} strokeOpacity={0.4} />
+      </motion.g>
+    );
+  }
 
   return (
     <g
       className={reachable ? 'cursor-pointer' : ''}
       onClick={onPick}
       style={{ pointerEvents: reachable ? 'auto' : 'none' }}
+      role={reachable ? 'button' : undefined}
+      aria-label={reachable ? `Move to ${node.label ?? 'this tile'}` : undefined}
     >
-      {/* ambient glow for places that hold light (wires the #soft filter) */}
-      {showGlow && (
-        <circle
+      {/* gate glow */}
+      {isGate && (
+        <motion.circle
           cx={node.x}
           cy={node.y}
-          r={radius - 2}
-          fill={glow}
-          opacity={beacon?.lit ? 0.55 : 0.22}
+          r={radius + 6}
+          fill="var(--color-ember)"
+          opacity={0.3}
           filter="url(#soft)"
+          animate={gateReady && !reduce ? { opacity: [0.3, 0.7, 0.3], scale: [1, 1.12, 1] } : { opacity: 0.3 }}
+          transition={gateReady && !reduce ? { duration: 1.6, repeat: Infinity, ease: 'easeInOut' } : undefined}
+          style={{ transformOrigin: `${node.x}px ${node.y}px` }}
         />
       )}
 
@@ -492,25 +428,25 @@ function NodeView({
           fill="none"
           stroke="var(--color-ember)"
           strokeWidth={2}
-          initial={{ opacity: 0.2, scale: 0.9 }}
-          animate={{ opacity: [0.25, 0.7, 0.25] }}
-          transition={{ duration: 1.4, repeat: Infinity }}
-          style={{ transformOrigin: `${node.x}px ${node.y}px` }}
+          initial={{ opacity: 0.2 }}
+          animate={reduce ? { opacity: 0.6 } : { opacity: [0.25, 0.7, 0.25] }}
+          transition={reduce ? undefined : { duration: 1.4, repeat: Infinity }}
         />
       )}
 
-      {/* threshold ring */}
-      {isThreshold && (
-        <circle
+      {/* fraying telegraph — this tile goes to the dark next */}
+      {fraying && (
+        <motion.circle
           cx={node.x}
           cy={node.y}
-          r={radius + 6}
+          r={radius + 4}
           fill="none"
-          stroke={sealed ? 'var(--color-haze)' : 'var(--color-ember-bright)'}
-          strokeWidth={2}
-          strokeDasharray={sealed ? '4 6' : undefined}
-          opacity={sealed ? 0.6 : 1}
-          style={sealed ? undefined : { filter: 'drop-shadow(0 0 10px var(--color-ember))' }}
+          stroke="var(--color-dread-bright)"
+          strokeWidth={1.6}
+          strokeDasharray="2 5"
+          animate={reduce ? { opacity: 0.6 } : { opacity: [0.3, 0.8, 0.3], rotate: [0, 30, 0] }}
+          transition={reduce ? undefined : { duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+          style={{ transformOrigin: `${node.x}px ${node.y}px`, pointerEvents: 'none' }}
         />
       )}
 
@@ -518,57 +454,22 @@ function NodeView({
         cx={node.x}
         cy={node.y}
         r={radius}
-        fill={beacon?.lit ? 'url(#nd-beacon-lit)' : NODE_GRAD[node.type]}
-        stroke={beacon?.lit ? 'var(--color-ember-bright)' : 'var(--color-node-rim)'}
+        fill={isGate ? 'url(#nd-gate)' : 'url(#nd-tile)'}
+        stroke={isGate ? 'var(--color-ember-bright)' : fraying ? 'var(--color-dread-deep)' : 'var(--color-node-rim)'}
         strokeWidth={2}
-        style={beacon?.lit ? { filter: 'drop-shadow(0 0 16px var(--color-ember))' } : undefined}
+        opacity={fraying ? 0.72 : 1}
+        style={isGate ? { filter: 'drop-shadow(0 0 14px var(--color-ember))' } : undefined}
       />
 
-      {/* drawn sigils — not Unicode glyphs */}
-      <Sigil node={node} sealed={sealed} />
+      {/* the Gate glyph + delivered lanterns */}
+      {isGate && <GateGlyph x={node.x} y={node.y} delivered={delivered} />}
 
-      {/* beacon kindling progress — a ring that fills as ember is poured in */}
-      {beacon && !beacon.lit && beacon.progress > 0 && (
-        <circle
-          cx={node.x}
-          cy={node.y}
-          r={radius + 5}
-          fill="none"
-          stroke="var(--color-ember)"
-          strokeWidth={3.5}
-          strokeLinecap="round"
-          strokeDasharray={`${Math.min(1, beacon.progress / G.beaconNeed) * 2 * Math.PI * (radius + 5)} ${2 * Math.PI * (radius + 5)}`}
-          transform={`rotate(-90 ${node.x} ${node.y})`}
-          style={{ filter: 'drop-shadow(0 0 4px var(--color-ember))', transition: 'stroke-dasharray 500ms ease' }}
-        />
-      )}
-      {beacon && !beacon.lit && (
-        <text
-          x={node.x}
-          y={node.y + 4}
-          textAnchor="middle"
-          className="font-display"
-          fontSize={12}
-          fill="var(--color-ember)"
-          opacity={0.92}
-          style={{ pointerEvents: 'none' }}
-        >
-          {beacon.progress}/{G.beaconNeed}
-        </text>
-      )}
-      {beacon?.lit && <BeaconFlame x={node.x} y={node.y} />}
+      {/* an on-board Lantern waiting to be grabbed */}
+      {lantern && <LanternGlyph x={node.x} y={node.y} reduce={reduce} />}
 
       {/* label */}
       {node.label && (
-        <text
-          x={node.x}
-          y={node.y + radius + 16}
-          textAnchor="middle"
-          className="font-display"
-          fontSize={13}
-          fill="var(--color-parchment-dim)"
-          opacity={0.85}
-        >
+        <text x={node.x} y={node.y + radius + 15} textAnchor="middle" className="font-display" fontSize={12} fill="var(--color-parchment-dim)" opacity={0.85}>
           {node.label}
         </text>
       )}
@@ -576,93 +477,55 @@ function NodeView({
   );
 }
 
-/** Hand-drawn place-sigils (no Unicode). */
-function Sigil({ node, sealed }: { node: BoardNode; sealed: boolean }) {
-  const { x, y, type } = node;
-  const noEvt = { pointerEvents: 'none' as const };
-  switch (type) {
-    case 'wellspring':
-      return (
-        <g stroke="var(--color-glow-well)" strokeWidth={1.6} fill="none" opacity={0.95} style={noEvt}>
-          <path d={`M ${x - 9} ${y - 1} Q ${x} ${y + 9} ${x + 9} ${y - 1}`} strokeLinecap="round" />
-          <path d={`M ${x - 6} ${y - 5} Q ${x} ${y + 3} ${x + 6} ${y - 5}`} strokeLinecap="round" />
-          <circle cx={x} cy={y - 7} r={1.7} fill="var(--color-glow-well)" stroke="none" />
-        </g>
-      );
-    case 'shrine':
-      return (
-        <g fill="var(--color-glow-shrine)" opacity={0.95} style={noEvt}>
-          <path d={`M ${x} ${y - 11} L ${x + 3} ${y} L ${x} ${y + 11} L ${x - 3} ${y} Z`} />
-          <path d={`M ${x - 11} ${y} L ${x} ${y - 3} L ${x + 11} ${y} L ${x} ${y + 3} Z`} />
-        </g>
-      );
-    case 'hearth':
-      return (
-        <path
-          d={`M ${x} ${y - 11} C ${x + 9} ${y - 1} ${x + 5} ${y + 8} ${x} ${y + 8} C ${x - 5} ${y + 8} ${x - 9} ${y - 1} ${x} ${y - 11} Z`}
-          fill="var(--color-ember-bright)"
-          opacity={0.95}
-          style={{ ...noEvt, filter: 'drop-shadow(0 0 6px var(--color-ember))' }}
-        />
-      );
-    case 'threshold':
-      return (
-        <g style={noEvt}>
-          <path
-            d={`M ${x - 9} ${y + 11} L ${x - 9} ${y - 3} Q ${x} ${y - 15} ${x + 9} ${y - 3} L ${x + 9} ${y + 11}`}
-            fill="none"
-            stroke={sealed ? 'var(--color-fog-dim)' : 'var(--color-ember-bright)'}
-            strokeWidth={2}
-            strokeLinecap="round"
-            style={sealed ? undefined : { filter: 'drop-shadow(0 0 6px var(--color-ember))' }}
-          />
-          {sealed ? (
-            <line x1={x - 9} y1={y + 4} x2={x + 9} y2={y + 4} stroke="var(--color-fog-dim)" strokeWidth={2} strokeDasharray="3 3" />
-          ) : (
-            <path d={`M ${x} ${y - 4} L ${x + 2.5} ${y + 2} L ${x} ${y + 8} L ${x - 2.5} ${y + 2} Z`} fill="var(--color-ember-glow)" />
-          )}
-        </g>
-      );
-    default:
-      return null;
-  }
-}
-
-function BeaconFlame({ x, y }: { x: number; y: number }) {
+function GateGlyph({ x, y, delivered }: { x: number; y: number; delivered: number }) {
   return (
     <g style={{ pointerEvents: 'none' }}>
-      {/* the light it throws on the dark */}
-      <motion.circle
-        cx={x}
-        cy={y}
-        r={44}
-        fill="var(--color-ember)"
-        style={{ filter: 'url(#soft)' }}
-        animate={{ opacity: [0.12, 0.24, 0.12] }}
-        transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
+      {/* an archway home */}
+      <path
+        d={`M ${x - 11} ${y + 12} L ${x - 11} ${y - 4} Q ${x} ${y - 17} ${x + 11} ${y - 4} L ${x + 11} ${y + 12}`}
+        fill="none"
+        stroke="var(--color-ink)"
+        strokeWidth={2.4}
+        strokeLinecap="round"
+        opacity={0.7}
       />
-      {/* bloom-in core */}
-      <motion.circle
-        cx={x}
-        cy={y}
-        r={9}
-        fill="var(--color-ember-bright)"
-        initial={{ scale: 0 }}
-        animate={{ scale: [0, 1.6, 1] }}
-        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-        style={{ transformOrigin: `${x}px ${y}px`, filter: 'drop-shadow(0 0 12px var(--color-ember))' }}
-      />
-      {/* the living flame */}
-      <motion.circle
-        cx={x}
-        cy={y - 2}
-        r={5}
-        fill="var(--color-ember-glow)"
-        animate={{ scale: [1, 1.22, 0.9, 1.12, 1], opacity: [0.9, 1, 0.82, 1, 0.9] }}
-        transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
-        style={{ transformOrigin: `${x}px ${y - 2}px` }}
-      />
+      {/* delivered lanterns line up under the arch */}
+      {Array.from({ length: delivered }).map((_, i) => (
+        <circle
+          key={i}
+          cx={x - (delivered - 1) * 4 + i * 8}
+          cy={y + 8}
+          r={2.4}
+          fill="var(--color-ember-glow)"
+          style={{ filter: 'drop-shadow(0 0 4px var(--color-ember))' }}
+        />
+      ))}
     </g>
+  );
+}
+
+function LanternGlyph({ x, y, reduce }: { x: number; y: number; reduce: boolean }) {
+  return (
+    <motion.g
+      style={{ pointerEvents: 'none' }}
+      animate={reduce ? undefined : { y: [0, -2.5, 0] }}
+      transition={reduce ? undefined : { duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+    >
+      <circle cx={x} cy={y} r={16} fill="url(#lantern-glow)" opacity={0.9} />
+      {/* the lantern body */}
+      <rect x={x - 4.5} y={y - 5} width={9} height={11} rx={2} fill="var(--color-ember)" stroke="var(--color-ember-bright)" strokeWidth={1} />
+      <line x1={x - 4.5} y1={y - 5} x2={x + 4.5} y2={y - 5} stroke="var(--color-ember-bright)" strokeWidth={1.4} />
+      <path d={`M ${x - 3} ${y - 5} Q ${x} ${y - 11} ${x + 3} ${y - 5}`} fill="none" stroke="var(--color-ember-bright)" strokeWidth={1.2} />
+      <motion.circle
+        cx={x}
+        cy={y + 0.5}
+        r={2}
+        fill="var(--color-ember-glow)"
+        animate={reduce ? undefined : { opacity: [0.7, 1, 0.7], scale: [1, 1.2, 1] }}
+        transition={reduce ? undefined : { duration: 1.4, repeat: Infinity }}
+        style={{ transformOrigin: `${x}px ${y}px`, filter: 'drop-shadow(0 0 4px var(--color-ember))' }}
+      />
+    </motion.g>
   );
 }
 
@@ -671,6 +534,8 @@ function PlayerTokenView({
   y,
   color,
   name,
+  torch,
+  carrying,
   showName,
   wisp,
   isCurrent,
@@ -679,16 +544,15 @@ function PlayerTokenView({
   y: number;
   color: string;
   name: string;
+  torch: number;
+  carrying: number;
   showName: boolean;
   wisp: boolean;
   isCurrent: boolean;
 }) {
+  const flame = Math.max(0, Math.min(1, torch / TORCH_MAX));
   return (
-    <motion.g
-      initial={false}
-      animate={{ x, y }}
-      transition={{ type: 'spring', stiffness: 200, damping: 24 }}
-    >
+    <motion.g initial={false} animate={{ x, y }} transition={{ type: 'spring', stiffness: 200, damping: 24 }}>
       {isCurrent && (
         <motion.circle
           r={15}
@@ -700,28 +564,36 @@ function PlayerTokenView({
         />
       )}
       {wisp ? (
-        // a Wisp — a guttering, drifting mote, not a solid pawn
-        <motion.g
-          animate={{ y: [0, -3, 0], opacity: [0.55, 0.85, 0.55] }}
-          transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
-        >
+        <motion.g animate={{ y: [0, -3, 0], opacity: [0.55, 0.85, 0.55] }} transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}>
           <circle r={7} fill={color} opacity={0.28} style={{ filter: 'url(#soft)' }} />
           <circle r={3.4} fill="var(--color-parchment)" opacity={0.7} />
-          <circle r={1.6} fill="var(--color-ember-bright)" style={{ filter: 'drop-shadow(0 0 4px var(--color-ember))' }} />
+          <circle r={1.6} fill="var(--color-fog)" />
         </motion.g>
       ) : (
         <>
-          <circle
-            r={10}
-            fill={color}
-            stroke="var(--color-void)"
-            strokeWidth={2}
-            style={{ filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.55))' }}
-          />
-          {/* glossy bead highlight */}
+          <circle r={10} fill={color} stroke="var(--color-void)" strokeWidth={2} style={{ filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.55))' }} />
           <circle cx={-3} cy={-3.5} r={3} fill="var(--color-parchment)" opacity={0.4} />
-          {/* the lantern they carry */}
-          <circle cx={8} cy={6} r={2.6} fill="var(--color-ember-bright)" style={{ filter: 'drop-shadow(0 0 5px var(--color-ember))' }} />
+          {/* the torch flame — height tracks how much life is left */}
+          <g transform="translate(9, -9)">
+            <motion.path
+              d={`M 0 0 C ${2.2} ${-2 - flame * 5} 0 ${-4 - flame * 8} 0 ${-4 - flame * 8} C 0 ${-4 - flame * 8} ${-2.2} ${-2 - flame * 5} 0 0 Z`}
+              fill={flame > 0.34 ? 'var(--color-ember-bright)' : 'var(--color-dread-bright)'}
+              animate={{ scaleY: [1, 1.15, 0.92, 1], opacity: [0.85, 1, 0.85] }}
+              transition={{ duration: 1.3, repeat: Infinity, ease: 'easeInOut' }}
+              style={{ transformOrigin: '0px 0px', filter: 'drop-shadow(0 0 4px var(--color-ember))' }}
+            />
+          </g>
+          {/* a carried Lantern rides on the token */}
+          {carrying > 0 && (
+            <g transform="translate(-9, 4)">
+              <rect x={-3} y={-3.5} width={6} height={7.5} rx={1.5} fill="var(--color-ember)" stroke="var(--color-ember-bright)" strokeWidth={0.8} style={{ filter: 'drop-shadow(0 0 5px var(--color-ember))' }} />
+              {carrying > 1 && (
+                <text x={0} y={2} textAnchor="middle" fontSize={5} fill="var(--color-ink)" className="font-display">
+                  {carrying}
+                </text>
+              )}
+            </g>
+          )}
         </>
       )}
       {showName && (

@@ -15,10 +15,7 @@ async function clickText(page, text) {
     return els.find((e) => e.textContent.trim().toLowerCase().includes(t.toLowerCase())) || null;
   }, text);
   const el = handle.asElement();
-  if (el) {
-    await el.click();
-    return true;
-  }
+  if (el) { await el.click(); return true; }
   return false;
 }
 
@@ -31,58 +28,47 @@ const browser = await puppeteer.launch({
 const page = await browser.newPage();
 await page.goto('http://localhost:5173/', { waitUntil: 'networkidle2', timeout: 30000 });
 await sleep(1400);
-await page.screenshot({ path: `${OUT}/01-tutorial.png` });
+await page.screenshot({ path: `${OUT}/01-setup-or-tutorial.png` });
 
-// skip tutorial
 await clickText(page, 'skip');
-await sleep(900);
-// choose 4 players + the Marked + AI
-await page.evaluate(() => {
-  const four = [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === '4');
-  four?.click();
-});
-await sleep(300);
-await clickText(page, 'The Marked');
-await sleep(200);
+await sleep(700);
 await page.screenshot({ path: `${OUT}/02-setup.png` });
 
-// start
 await clickText(page, 'Into the Dusk');
-await sleep(2000);
-await page.screenshot({ path: `${OUT}/03-start.png` });
+await sleep(1800);
+await page.screenshot({ path: `${OUT}/03-handoff.png` });
 
-// dismiss a handoff if shown
 await clickText(page, 'reveal my turn');
-await sleep(600);
+await sleep(500);
 await clickText(page, 'begin');
-await sleep(900);
-// dismiss the Marked reveal if this seat happens to be the Marked
-await clickText(page, 'understand the dark');
+await sleep(1000);
+await clickText(page, 'understand the dark'); // dismiss Marked reveal if present
 await sleep(700);
-await page.screenshot({ path: `${OUT}/04-after-handoff.png` });
+await page.screenshot({ path: `${OUT}/04-board.png` });
 
-// if an omen panel is up, screenshot then resolve the first choice
-await sleep(400);
-await page.screenshot({ path: `${OUT}/05-omen.png` });
-// resolve any pending omen(s) by clicking the first narrator choice button
-for (let k = 0; k < 3; k++) {
-  const clicked = await page.evaluate(() => {
-    const b = document.querySelector('button.group');
-    if (b) {
-      b.click();
-      return true;
-    }
-    return false;
+// play several full turns so the dark eats, the nightmare walks, an event flips
+for (let t = 0; t < 6; t++) {
+  await clickText(page, 'roll to move');
+  await sleep(700);
+  // tap a reachable tile (a role=button node on the svg)
+  await page.evaluate(() => {
+    const n = document.querySelector('svg [role=button]');
+    if (n) n.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
-  await sleep(900);
-  if (!clicked) break;
+  await sleep(700);
+  if (t === 2) await page.screenshot({ path: `${OUT}/05-midturn.png` });
+  // take the ③ action (grab/deliver/warm/end) then any handoff
+  await page.evaluate(() => {
+    const b = [...document.querySelectorAll('button')].find((x) => /^③|end turn|grab|deliver|warm|relight|step through/i.test(x.textContent.trim()));
+    b?.click();
+  });
+  await sleep(800);
+  await clickText(page, 'reveal my turn');
+  await sleep(300);
+  await clickText(page, 'begin');
+  await sleep(500);
 }
-await page.screenshot({ path: `${OUT}/06-board.png` });
-
-// roll stride
-await clickText(page, 'Roll Stride');
-await sleep(1600);
-await page.screenshot({ path: `${OUT}/07-board-rolled.png` });
+await page.screenshot({ path: `${OUT}/06-later.png` });
 
 await browser.close();
 console.log('shots written to', OUT);

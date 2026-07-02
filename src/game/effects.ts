@@ -177,11 +177,23 @@ export function eatFrontier(G: GState, k: number): void {
       l.nodeId = sweepInward(G, l.nodeId);
     }
   }
-  if (isVoid(G, G.nightmare.nodeId)) G.nightmare.nodeId = sweepInward(G, G.nightmare.nodeId);
+  if (isVoid(G, G.nightmare.nodeId)) {
+    const nm = sweepInward(G, G.nightmare.nodeId);
+    // if swept to the warded Gate, hop to a surviving non-Gate neighbour of it instead
+    G.nightmare.nodeId =
+      nm === G.gateId
+        ? G.nodes[G.gateId].neighbors.find((m) => !isVoid(G, m)) ?? nm
+        : nm;
+  }
 }
 
 // ── BFS over surviving tiles (the Nightmare and reachability) ────────────────
-function bfsNextStep(G: GState, from: number, goals: Set<number>): number | null {
+function bfsNextStep(
+  G: GState,
+  from: number,
+  goals: Set<number>,
+  blocked?: (id: number) => boolean,
+): number | null {
   if (goals.has(from)) return null;
   const prev = new Map<number, number>();
   const seen = new Set([from]);
@@ -189,7 +201,7 @@ function bfsNextStep(G: GState, from: number, goals: Set<number>): number | null
   while (q.length) {
     const cur = q.shift()!;
     for (const n of G.nodes[cur].neighbors) {
-      if (seen.has(n) || isVoid(G, n)) continue;
+      if (seen.has(n) || isVoid(G, n) || (blocked && blocked(n) && !goals.has(n))) continue;
       seen.add(n);
       prev.set(n, cur);
       if (goals.has(n)) {
@@ -227,24 +239,32 @@ export function reachable(G: GState, from: number, stride: number): Set<number> 
 
 // ── The Nightmare (embodied hunter) ─────────────────────────────────────────
 const nonWisp = (G: GState) => Object.values(G.players).filter((p) => !p.wisp);
+/** The Nightmare hunts torches OUT in the field — the Gate's light is sanctuary,
+ *  so a bearer standing on the Gate is safe and never a target (PLAN §B.4). */
 function nearestTorchGoals(G: GState): Set<number> {
-  return new Set(nonWisp(G).map((p) => p.nodeId));
+  return new Set(nonWisp(G).filter((p) => p.nodeId !== G.gateId).map((p) => p.nodeId));
 }
-/** One step of the Nightmare toward the nearest torch; resolves a catch on arrival. */
+/** One step of the Nightmare toward the nearest exposed torch; resolves a catch on
+ *  arrival. It can never step onto the Gate (the last light wards it). */
 export function nightmareStep(G: GState): void {
+  const wardsGate = (id: number) => id === G.gateId;
   const goals = nearestTorchGoals(G);
   if (goals.size === 0) {
     G.nightmare.nextNodeId = null;
-    return;
+    return; // everyone's home or a Wisp — the Nightmare has nothing to chase
   }
-  const step = bfsNextStep(G, G.nightmare.nodeId, goals);
-  if (step !== null) G.nightmare.nodeId = step;
+  const step = bfsNextStep(G, G.nightmare.nodeId, goals, wardsGate);
+  if (step !== null && step !== G.gateId) G.nightmare.nodeId = step;
   flash(G, 'nightmare', G.nightmare.nodeId);
-  for (const p of nonWisp(G).filter((q) => q.nodeId === G.nightmare.nodeId)) {
+  for (const p of nonWisp(G).filter((q) => q.nodeId === G.nightmare.nodeId && q.nodeId !== G.gateId)) {
     const dropped = dropCarried(G, p, p.nodeId);
     burnTorch(G, p, NIGHTMARE_SNUFF);
     flash(G, 'snuff', p.nodeId);
-    if (!p.wisp) p.nodeId = sweepInward(G, p.nodeId); // knocked back a tile toward the Gate
+    if (!p.wisp) {
+      // knocked back a tile, but never shoved into the safe Gate (that's a reward, not a hit)
+      const back = sweepInward(G, p.nodeId);
+      p.nodeId = back === G.gateId ? p.nodeId : back;
+    }
     log(
       G,
       dropped.length
@@ -255,7 +275,7 @@ export function nightmareStep(G: GState): void {
   }
   // telegraph the next footfall
   const g2 = nearestTorchGoals(G);
-  G.nightmare.nextNodeId = g2.size ? bfsNextStep(G, G.nightmare.nodeId, g2) : null;
+  G.nightmare.nextNodeId = g2.size ? bfsNextStep(G, G.nightmare.nodeId, g2, (id) => id === G.gateId) : null;
 }
 
 // ── Events (illustrated cards — a visible board effect) ──────────────────────

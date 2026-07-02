@@ -18,7 +18,7 @@ export function TopBar() {
           GLOAMING
         </h1>
         <span className="hidden font-body text-xs italic text-fog-dim sm:inline">
-          the board that plays back
+          trapped inside
         </span>
       </div>
 
