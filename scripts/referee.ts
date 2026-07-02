@@ -347,6 +347,60 @@ section('Ember-Hearted adjacency Relight (H14)');
   assert(back && !G3.players['1'].wisp, 'Ember-Hearted relights a Wisp resting on the Gate from the next tile');
 }
 
+// ── §H.13 — PITCH bearer-hunting prefers bearers yet never strands the Hollow One ─
+section('Pitch bearer-hunting + fallback chain never strands (H13)');
+{
+  // (a) preference: an equidistant bearer is hunted over an empty-handed torch
+  const G = freshG(3);
+  G.act = 2; // Pitch
+  const nmTile = G.nodes.find((n) => RING_OF[n.id] === 2 && !isVoid(G, n.id))!;
+  const nbrs = nmTile.neighbors.filter((m) => !isVoid(G, m) && m !== GATE_ID);
+  G.nightmare.nodeId = nmTile.id;
+  const bearer = G.players['0'];
+  const empty = G.players['1'];
+  bearer.nodeId = nbrs[0];
+  bearer.carrying = [0];
+  G.lanterns[0].carriedBy = '0';
+  G.lanterns[0].nodeId = null;
+  empty.nodeId = nbrs[1];
+  empty.carrying = [];
+  G.players['2'].nodeId = GATE_ID;
+  const emptyTorch = empty.torch;
+  nightmareStep(G);
+  assert(G.nightmare.nodeId === nbrs[0], 'in Pitch the Hollow One steps onto the equidistant bearer, not the empty-handed torch');
+  assert(bearer.carrying.length === 0, 'the caught bearer drops the Lantern');
+  assert(empty.torch === emptyTorch, 'the empty-handed neighbour is ignored while a bearer is exposed');
+
+  // (b) fallback: no bearer in Pitch → it still targets an exposed torch (never stranded)
+  const G2 = freshG(2);
+  G2.act = 2;
+  const t2 = G2.nodes.filter((n) => RING_OF[n.id] === 2 && !isVoid(G2, n.id));
+  G2.players['0'].nodeId = t2[0].id;
+  G2.players['1'].nodeId = t2[3].id;
+  G2.nightmare.nodeId = G2.nodes.find((n) => RING_OF[n.id] === 1 && !isVoid(G2, n.id))!.id;
+  nightmareStep(G2);
+  assert(G2.nightmare.nextNodeId !== null, 'Pitch with no bearer falls back to an exposed torch');
+
+  // (c) idle: no exposed target at all → clean idle, no crash
+  const G3 = freshG(2);
+  G3.act = 2;
+  for (const p of Object.values(G3.players)) p.nodeId = GATE_ID;
+  nightmareStep(G3);
+  assert(G3.nightmare.nextNodeId === null && G3.nightmare.path.length === 0, 'no exposed torch → the Hollow One idles');
+}
+
+// ── the full path telegraph is coherent (path[0] === nextNodeId, all surviving) ─
+section('The Hollow One path telegraph is coherent');
+{
+  const G = freshG(3);
+  G.players['0'].nodeId = G.nodes.find((n) => RING_OF[n.id] === 3 && !isVoid(G, n.id))!.id;
+  G.nightmare.nodeId = G.nodes.find((n) => RING_OF[n.id] === 1 && !isVoid(G, n.id))!.id;
+  nightmareStep(G);
+  const path = G.nightmare.path;
+  assert(path.length === 0 || path[0] === G.nightmare.nextNodeId, 'path[0] equals the telegraphed next step');
+  assert(path.every((id) => !isVoid(G, id) && id !== GATE_ID), 'the route never crosses the void or the warded Gate');
+}
+
 // ── verdict ──────────────────────────────────────────────────────────────────
 console.log(`\n${failures === 0 ? '✓ REFEREE PASS — the turn can never dead-end or crash.' : `✗ REFEREE FAIL — ${failures} assertion(s) failed.`}`);
 process.exit(failures === 0 ? 0 : 1);

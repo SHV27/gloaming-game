@@ -18,7 +18,7 @@ export function effectText(card: EventCardT): string {
     case 'torchAll':
       return a >= 0 ? `every torch +${a}` : `every torch −${-a}`;
     case 'nightmareStep':
-      return `the Nightmare lurches +${a} step${a === 1 ? '' : 's'}`;
+      return `the Hollow One lurches +${a} step${a === 1 ? '' : 's'}`;
     case 'darkBite':
       return `the dark eats +${a} more tile${a === 1 ? '' : 's'}`;
     case 'lanternFlare':

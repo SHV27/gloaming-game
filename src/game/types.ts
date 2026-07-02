@@ -44,10 +44,11 @@ export interface Lantern {
   delivered: boolean; // reached the Gate
 }
 
-// ── The Nightmare — an embodied hunter that walks toward the nearest torch ───
+// ── The Hollow One — an embodied hunter that walks toward the nearest torch ───
 export interface Nightmare {
   nodeId: number;
-  nextNodeId: number | null; // telegraphed next step (the glowing footprint)
+  nextNodeId: number | null; // telegraphed next step (the glowing footprint) === path[0]
+  path: number[]; // S6 — the full telegraphed route ahead (chess-legible menace)
 }
 
 // ── Events — illustrated cards (icon + ≤4 words + a visible board effect) ─────

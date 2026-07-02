@@ -74,8 +74,8 @@ const STEPS: Step[] = [
   },
   {
     eyebrow: 'It walks toward you',
-    title: 'The Nightmare hunts',
-    body: 'A Nightmare stalks the board, each round taking a step toward the nearest torch — watch its glowing footprint to see where it will land. If it reaches you, you drop what you carry and reel back. Bait it away so a friend can grab a Lantern. The Gate is the one place it cannot follow.',
+    title: 'The Hollow One hunts',
+    body: 'A thing called the Hollow One stalks the board, stepping toward the nearest torch each round — its glowing trail shows the whole path it will take, so you always see it coming. Reach you and you drop what you carry and are flung back into the dark. As the night deepens it wakes and quickens, and at the end it hunts whoever carries a Lantern. Bait it; the Gate is the one place it cannot follow.',
     accent: dread,
     motif: (c) => (
       <g>
@@ -88,7 +88,7 @@ const STEPS: Step[] = [
   {
     eyebrow: 'Your turn — the whole rule',
     title: 'Roll · Move · one action',
-    body: 'Roll to move, then step to a glowing tile. Then one clear button appears for what you can do here: Grab a Lantern, Deliver it, Relight a friend, or End Turn. Then you watch the board: the dark eats, the Nightmare steps, a card flips. Win when all three Lanterns are home and everyone steps through the Gate — together.',
+    body: 'Roll to move, then step to a glowing tile. Then one clear button appears for what you can do here: Grab a Lantern, Deliver it, Relight a friend, or End Turn. Then you watch the board: the dark eats, the Hollow One steps, a card flips. Win when all three Lanterns are home and everyone steps through the Gate — together.',
     accent: glacier,
     motif: (c) => (
       <g>

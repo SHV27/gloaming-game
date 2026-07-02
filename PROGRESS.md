@@ -19,17 +19,24 @@ plannable future (+ the Grandmaster skill-gap proof). **No LLM at runtime. No en
 - **WS2** Heroes shipped. `heroes.ts` (5 passive one-liners); `Player.hero`; hooks wired in effects/gloaming
   (`strideFor(+1 / carry-0)`, Ember-Hearted adjacency relight, `nightmareGoals` excludes the *empty-handed*
   Unseen, Stubborn half-burn). `HeroSelect.tsx` (silhouette art, hotseat pick order); threaded App→GameMount→
-  client→setup; HUD hero line + roster labels. **Unseen rebalanced**: "overlooked *until you carry a Lantern*"
-  (immunity was 96%/+18.8 spread → now a bait/rescuer). Balance **2p50/3p51/4p57, per-hero spread 4.6 (≤±8),
-  nail 69–78%, 0 softlocks**; referee H12/H14 ✓; build ✓; console-check ✓ 0 errors. (3p dark table-mult 0.95→1.0.)
+  client→setup; HUD hero line + roster labels. **Unseen rebalanced**: "overlooked *until you carry a Lantern*".
+  (3p dark table-mult 0.95→1.0.)
+- **WS3** The Hollow One (crowned). `nightmare.path[]` full-route telegraph (`path[0]==nextNodeId`, ≤4 steps,
+  never crosses void/Gate); **Pitch bearer-hunting** (`nightmareGoals` prefers non-hidden bearers → torch →
+  idle, never strands). Board: fading footfall-trail path (glides on retarget = "changes its mind"); the token
+  **evolves by Act** (Dusk small/1 eye/slow → Gloaming wakes/2 eyes/quicker → Pitch big/fierce/gaze-beam);
+  **gaze** springs to face its quarry + lock-on flourish on new target. **Named THE HOLLOW ONE** (how-to, setup,
+  act-change beats, all logs/effect text). Balance **2p51/3p49/4p46 (in band), spread 6.8 (≤±8), nail 68–81%,
+  0 softlocks**; referee H12/H13/H14 + path-coherence ✓; build ✓; console-check ✓ 0 errors.
 
 ## ▶ NEXT ACTION
-**WS3 — The Hollow One (the Nightmare, crowned).** Add `nightmare.path: number[]` (full BFS route, `path[0]==
-nextNodeId`); in `nightmareStep` compute + store it. **Pitch (Act 2) bearer-hunting**: `nightmareGoals` prefers
-non-hidden Lantern-bearers, fallback nearest torch, fallback idle (referee H13 — never strand). Board: draw the
-full path as a fading footfall trail; act-evolution of the Hollow One token (Dusk shape→Gloaming wakes→Pitch
-hunts); presence (face target, lock-on flourish); the **name** in how-to + fog + act titles. Re-balance
-(`npm run playtest`) — bearer-hunting will lower win-rate; keep band. Referee + commit.
+**WS4 — Plannable future + the Grandmaster proof.** (1) **Omen**: expose the next event's suit (☠ dread / ✦ hope
+/ ⚡ calm) as a face-down card in the HUD (derive from `G.deck` top). (2) **What-if hover**: on a reachable tile,
+a silent ghost — "land here · N to a Lantern · in/out of the Hollow One's path". (3) **Grandmaster bot**
+(`scripts/grandmaster.ts` or a flag in playtest): plans 1–2 rounds ahead (escort/protect bearers, pre-position
+rescues, bait the Hollow One off carriers, avoid frayed tiles, refuel before guttering, read forecast+path).
+Print greedy vs smart win-rate per count; **require smart ≥ greedy +15 pts**; tune until skill pays. Referee +
+playtest + commit.
 
 ## S6 workstreams (see PLAN §J)
 1. ✅ WS1 baseline + PLAN v4 + CLAUDE.md.  2. WS2 Heroes.  3. WS3 The Hollow One.  4. WS4 Plannable future +

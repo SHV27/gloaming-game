@@ -136,7 +136,7 @@ export function makeGloaming(config: GloamingConfig): Game<GState> {
         lanternsDelivered: 0,
         dark: [],
         fraying: [],
-        nightmare: { nodeId: nmStart, nextNodeId: null },
+        nightmare: { nodeId: nmStart, nextNodeId: null, path: [] },
         act: 0,
         round: 1,
         darkCharge: 0,

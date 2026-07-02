@@ -230,6 +230,41 @@ function bfsNextStep(
   }
   return null;
 }
+/** The FULL shortest path (list of steps after `from`) toward the nearest goal —
+ *  the Hollow One's telegraphed route ahead (chess-legible menace). Empty if none. */
+function bfsPath(
+  G: GState,
+  from: number,
+  goals: Set<number>,
+  blocked?: (id: number) => boolean,
+): number[] {
+  if (goals.has(from)) return [];
+  const prev = new Map<number, number>();
+  const seen = new Set([from]);
+  const q = [from];
+  while (q.length) {
+    const cur = q.shift()!;
+    for (const n of G.nodes[cur].neighbors) {
+      if (seen.has(n) || isVoid(G, n) || (blocked && blocked(n) && !goals.has(n))) continue;
+      seen.add(n);
+      prev.set(n, cur);
+      if (goals.has(n)) {
+        const out: number[] = [];
+        let x: number | undefined = n;
+        while (x !== undefined && x !== from) {
+          out.unshift(x);
+          x = prev.get(x);
+        }
+        return out;
+      }
+      q.push(n);
+    }
+  }
+  return [];
+}
+/** How many steps of the Hollow One's route are telegraphed (drawn on the board). */
+const NM_TELEGRAPH = 4;
+
 /** Tiles reachable within `stride` graph-steps over surviving edges (for the glow). */
 export function reachable(G: GState, from: number, stride: number): Set<number> {
   const out = new Set<number>();
@@ -265,16 +300,32 @@ function isHidden(p: Player): boolean {
 }
 function nightmareGoals(G: GState): Set<number> {
   const exposed = nonWisp(G).filter((p) => p.nodeId !== G.gateId && !isHidden(p));
+  // PITCH (Act 2): the Hollow One wakes fully and hunts the Lanterns themselves —
+  // it locks onto the nearest exposed *bearer*. Fallback chain (bearers → any
+  // exposed torch → idle) can never strand it with no legal target (H13).
+  if (G.act >= 2) {
+    const bearers = exposed.filter((p) => p.carrying.length > 0);
+    if (bearers.length) return new Set(bearers.map((p) => p.nodeId));
+  }
   return new Set(exposed.map((p) => p.nodeId));
 }
-/** One step of the Nightmare toward the nearest exposed torch; resolves a catch on
- *  arrival. It can never step onto the Gate (the last light wards it). */
+/** Recompute + store the Hollow One's telegraphed route ahead (path[0] is its next
+ *  footfall). Empty when it has no legal target (everyone home / Wisp / hidden). */
+function retelegraphNightmare(G: GState): void {
+  const goals = nightmareGoals(G);
+  const path = goals.size ? bfsPath(G, G.nightmare.nodeId, goals, (id) => id === G.gateId) : [];
+  G.nightmare.path = path.slice(0, NM_TELEGRAPH);
+  G.nightmare.nextNodeId = G.nightmare.path[0] ?? null;
+}
+/** One step of the Hollow One toward its quarry; resolves a catch on arrival. It can
+ *  never step onto the Gate (the last light wards it). */
 export function nightmareStep(G: GState): void {
   const wardsGate = (id: number) => id === G.gateId;
   const goals = nightmareGoals(G);
   if (goals.size === 0) {
     G.nightmare.nextNodeId = null;
-    return; // everyone's home or a Wisp — the Nightmare has nothing to chase
+    G.nightmare.path = [];
+    return; // everyone's home or a Wisp — the Hollow One has nothing to chase
   }
   const step = bfsNextStep(G, G.nightmare.nodeId, goals, wardsGate);
   if (step !== null && step !== G.gateId) G.nightmare.nodeId = step;
@@ -287,14 +338,13 @@ export function nightmareStep(G: GState): void {
     log(
       G,
       dropped.length
-        ? `The Nightmare falls on ${p.name} — they drop everything and are flung back toward the dark.`
-        : `The Nightmare falls on ${p.name} — the cold tears through them and flings them toward the dark.`,
+        ? `The Hollow One falls on ${p.name} — they drop everything and are flung back toward the dark.`
+        : `The Hollow One falls on ${p.name} — the cold tears through them and flings them toward the dark.`,
       'dread',
     );
   }
-  // telegraph the next footfall
-  const g2 = nightmareGoals(G);
-  G.nightmare.nextNodeId = g2.size ? bfsNextStep(G, G.nightmare.nodeId, g2, (id) => id === G.gateId) : null;
+  // telegraph the full route to the next quarry
+  retelegraphNightmare(G);
 }
 
 // ── Events (illustrated cards — a visible board effect) ──────────────────────
@@ -420,7 +470,8 @@ export function refreshAct(G: GState): Act {
   G.act = actFromDeepestRing(deepestSurvivingRing(G));
   if (G.act > prev) {
     flash(G, 'act-change');
-    log(G, `${ACT_NAMES[G.act]} falls. The dark comes faster now.`, 'dread');
+    const stir = G.act >= 2 ? 'The Hollow One hunts the Lanterns now.' : 'The Hollow One wakes, and quickens.';
+    log(G, `${ACT_NAMES[G.act]} falls. ${stir}`, 'dread');
   }
   return G.act;
 }

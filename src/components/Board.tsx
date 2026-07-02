@@ -145,6 +145,14 @@ export function GloamingBoard(props: BoardProps<GState>) {
     for (const step of pathTo(G, me.nodeId, nodeId)) moves.moveTo(step);
   };
 
+  // the Hollow One's gaze angle — it turns to look at its next footfall
+  const nmGaze = useMemo(() => {
+    const from = G.nodes[G.nightmare.nodeId];
+    if (G.nightmare.nextNodeId == null) return 0;
+    const to = G.nodes[G.nightmare.nextNodeId];
+    return (Math.atan2(to.y - from.y, to.x - from.x) * 180) / Math.PI;
+  }, [G.nightmare, G.nodes]);
+
   const handoffNeeded = !ctx.gameover && playerID !== ctx.currentPlayer;
 
   return (
@@ -268,10 +276,8 @@ export function GloamingBoard(props: BoardProps<GState>) {
                 />
               ))}
 
-              {/* the Nightmare's telegraphed next footfall */}
-              {G.nightmare.nextNodeId != null && !isVoid(G, G.nightmare.nextNodeId) && (
-                <Footprint x={G.nodes[G.nightmare.nextNodeId].x} y={G.nodes[G.nightmare.nextNodeId].y} reduce={reduce} />
-              )}
+              {/* the Hollow One's telegraphed route ahead (chess-legible menace) */}
+              <NightmarePath G={G} reduce={reduce} />
 
               {/* player tokens */}
               {Object.values(G.players).map((p) => {
@@ -298,8 +304,15 @@ export function GloamingBoard(props: BoardProps<GState>) {
                 );
               })}
 
-              {/* the Nightmare */}
-              <NightmareToken x={G.nodes[G.nightmare.nodeId].x} y={G.nodes[G.nightmare.nodeId].y} reduce={reduce} />
+              {/* the Hollow One — evolves with the Acts, turns to look at its quarry */}
+              <NightmareToken
+                x={G.nodes[G.nightmare.nodeId].x}
+                y={G.nodes[G.nightmare.nodeId].y}
+                act={G.act}
+                targetId={G.nightmare.nextNodeId}
+                gazeAngle={nmGaze}
+                reduce={reduce}
+              />
             </svg>
           </motion.div>
 
@@ -355,49 +368,120 @@ export function GloamingBoard(props: BoardProps<GState>) {
   );
 }
 
-// ── the Nightmare ─────────────────────────────────────────────────────────────
-function NightmareToken({ x, y, reduce }: { x: number; y: number; reduce: boolean }) {
+// ── the Hollow One ────────────────────────────────────────────────────────────
+/** The evolving villain. Dusk: a small shape in the fog. The Gloaming: it wakes —
+ *  a second eye, quicker, larger. Pitch: it hunts — biggest, fiercest, a gaze-beam.
+ *  Its gaze always turns to look at its next footfall (and snaps on a new target). */
+function NightmareToken({
+  x,
+  y,
+  act,
+  targetId,
+  gazeAngle,
+  reduce,
+}: {
+  x: number;
+  y: number;
+  act: number;
+  targetId: number | null;
+  gazeAngle: number;
+  reduce: boolean;
+}) {
+  const size = [0.82, 1.0, 1.2][act] ?? 1;
+  const pulse = [2.6, 1.7, 1.05][act] ?? 1.7;
+  const auraPeak = [0.34, 0.46, 0.6][act] ?? 0.46;
+  const twoEyes = act >= 1;
+  const eyeR = act >= 2 ? 2.9 : 2.4;
   return (
     <motion.g initial={false} animate={{ x, y }} transition={{ type: 'tween', duration: 0.7, ease: 'easeInOut' }}>
-      {/* NB: animate the scale TRANSFORM, never the r ATTRIBUTE (framer emits r=undefined otherwise) */}
-      <motion.circle
-        r={22}
-        fill="var(--color-dread)"
-        filter="url(#soft)"
-        animate={reduce ? { scale: 1, opacity: 0.32 } : { scale: [0.82, 1.18, 0.82], opacity: [0.2, 0.44, 0.2] }}
-        transition={reduce ? undefined : { duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+      {/* NB: animate the scale TRANSFORM, never the r ATTRIBUTE */}
+      <motion.g
+        animate={{ scale: size }}
+        transition={{ type: 'spring', stiffness: 90, damping: 16 }}
         style={{ transformOrigin: '0px 0px' }}
-      />
-      <path
-        d="M0,-17 L7,-4 L16,-2 L8,6 L10,17 L0,10 L-10,17 L-8,6 L-16,-2 L-7,-4 Z"
-        fill="var(--color-void)"
-        stroke="var(--color-dread)"
-        strokeWidth={1.6}
-        strokeLinejoin="round"
-      />
-      <motion.circle
-        r={3.6}
-        cy={-2}
-        fill="var(--color-dread-bright)"
-        animate={reduce ? undefined : { opacity: [1, 0.35, 1] }}
-        transition={reduce ? undefined : { duration: 1.4, repeat: Infinity }}
-        style={{ filter: 'drop-shadow(0 0 6px var(--color-dread-bright))' }}
-      />
+      >
+        <motion.circle
+          r={22}
+          fill="var(--color-dread)"
+          filter="url(#soft)"
+          animate={reduce ? { scale: 1, opacity: auraPeak * 0.7 } : { scale: [0.82, 1.18, 0.82], opacity: [0.18, auraPeak, 0.18] }}
+          transition={reduce ? undefined : { duration: pulse, repeat: Infinity, ease: 'easeInOut' }}
+          style={{ transformOrigin: '0px 0px' }}
+        />
+        <path
+          d="M0,-17 L7,-4 L16,-2 L8,6 L10,17 L0,10 L-10,17 L-8,6 L-16,-2 L-7,-4 Z"
+          fill="var(--color-void)"
+          stroke="var(--color-dread)"
+          strokeWidth={1.6}
+          strokeLinejoin="round"
+        />
+        {/* the gaze — turns to face the quarry, springing round on a new target */}
+        <motion.g animate={{ rotate: gazeAngle }} transition={{ type: 'spring', stiffness: 130, damping: 12 }} style={{ transformOrigin: '0px 0px' }}>
+          {/* a lock-on beam once it has fully woken (Pitch) */}
+          {act >= 2 && <path d="M6 0 L26 -5 L26 5 Z" fill="var(--color-dread-bright)" opacity={0.16} />}
+          {/* eyes remount on a new target → a half-second lock-on flourish */}
+          <motion.g
+            key={targetId ?? 'idle'}
+            initial={reduce ? false : { scale: 1.6, opacity: 0.4 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 16 }}
+          >
+            <motion.circle
+              r={eyeR}
+              cx={twoEyes ? 6 : 4}
+              cy={twoEyes ? -3.2 : 0}
+              fill="var(--color-dread-bright)"
+              animate={reduce ? undefined : { opacity: [1, 0.4, 1] }}
+              transition={reduce ? undefined : { duration: act >= 2 ? 0.9 : 1.4, repeat: Infinity }}
+              style={{ filter: 'drop-shadow(0 0 6px var(--color-dread-bright))' }}
+            />
+            {twoEyes && (
+              <motion.circle
+                r={eyeR}
+                cx={6}
+                cy={3.2}
+                fill="var(--color-dread-bright)"
+                animate={reduce ? undefined : { opacity: [1, 0.4, 1] }}
+                transition={reduce ? undefined : { duration: act >= 2 ? 0.9 : 1.4, repeat: Infinity }}
+                style={{ filter: 'drop-shadow(0 0 6px var(--color-dread-bright))' }}
+              />
+            )}
+          </motion.g>
+        </motion.g>
+      </motion.g>
     </motion.g>
   );
 }
 
-function Footprint({ x, y, reduce }: { x: number; y: number; reduce: boolean }) {
+/** The Hollow One's whole intended route ahead — a thread of fading footfalls that
+ *  glide to new tiles when it changes its mind (personality for free). */
+function NightmarePath({ G, reduce }: { G: GState; reduce: boolean }) {
+  const path = G.nightmare.path.filter((id) => !isVoid(G, id));
+  if (!path.length) return null;
+  const from = G.nodes[G.nightmare.nodeId];
+  const pts = [from, ...path.map((id) => G.nodes[id])].map((n) => `${n.x},${n.y}`).join(' ');
   return (
-    <motion.g style={{ pointerEvents: 'none' }} initial={false} animate={{ x, y }} transition={{ duration: 0.6 }}>
+    <g style={{ pointerEvents: 'none' }}>
+      <polyline points={pts} fill="none" stroke="var(--color-dread-bright)" strokeWidth={1.3} strokeDasharray="2 8" strokeOpacity={0.3} />
+      {path.map((id, i) => (
+        <Footprint key={i} x={G.nodes[id].x} y={G.nodes[id].y} reduce={reduce} lead={i === 0} fade={1 - i / (path.length + 0.6)} index={i} />
+      ))}
+    </g>
+  );
+}
+
+function Footprint({ x, y, reduce, lead, fade, index }: { x: number; y: number; reduce: boolean; lead: boolean; fade: number; index: number }) {
+  const peak = (lead ? 0.85 : 0.5) * fade;
+  return (
+    <motion.g style={{ pointerEvents: 'none' }} initial={false} animate={{ x, y }} transition={{ type: 'spring', stiffness: 160, damping: 20 }}>
       <motion.circle
-        r={17}
+        r={lead ? 17 : 12}
         fill="none"
         stroke="var(--color-dread-bright)"
-        strokeWidth={2}
+        strokeWidth={lead ? 2 : 1.4}
         strokeDasharray="3 6"
-        animate={reduce ? { opacity: 0.6 } : { opacity: [0.25, 0.8, 0.25], scale: [0.92, 1.06, 0.92] }}
-        transition={reduce ? undefined : { duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+        animate={reduce ? { opacity: peak * 0.8 } : { opacity: [0.18 * fade, peak, 0.18 * fade], scale: [0.92, lead ? 1.08 : 1.0, 0.92] }}
+        transition={reduce ? undefined : { duration: 1.6, repeat: Infinity, ease: 'easeInOut', delay: index * 0.12 }}
         style={{ transformOrigin: '0px 0px' }}
       />
     </motion.g>

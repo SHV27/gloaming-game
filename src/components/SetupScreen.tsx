@@ -97,8 +97,8 @@ export function SetupScreen({ onStart }: { onStart: (names: string[], opts: Star
             The <span className="text-dread-bright">dark</span> eats the board from the edges in. Carry the{' '}
             <span className="text-ember">three Lanterns</span> to the{' '}
             <span className="text-ember-bright">Gate</span> and get everyone out together — before the dark reaches
-            the middle. Don't let your <span className="text-ember">torch</span> go out. Don't get caught. Don't leave
-            anyone behind.
+            the middle. Don't let your <span className="text-ember">torch</span> go out. Don't get caught by the{' '}
+            <span className="text-dread-bright">Hollow One</span>. Don't leave anyone behind.
           </p>
 
           {/* count */}
