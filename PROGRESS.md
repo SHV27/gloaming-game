@@ -1,17 +1,23 @@
-# PROGRESS.md — GLOAMING (*Trapped Inside*) · Session 6: THE CROWNING
+# PROGRESS.md — GLOAMING (*Trapped Inside*) · Session 6: THE CROWNING ✅ SHIPPED
 
 > Resumable checkpoint. A fresh session reads this + `PLAN.md` (v4) and continues.
-> Update after every workstream. One next action, always.
 
 ---
 
-## Where we are — S6 THE CROWNING (final release), in progress
-**Live (v3): https://gloaming-murex.vercel.app** · Repo: https://github.com/SHV27/gloaming-game (master).
+## Where we are — S6 THE CROWNING: ✅ SHIPPED & CERTIFIED (2026-07-03)
+**Live: https://gloaming-murex.vercel.app** (prod console-check = 0 errors through real gameplay).
+Repo: https://github.com/SHV27/gloaming-game (master, pushed). **The game is FINISHED.**
 
-v3 is **SHIPPED and LOVED** (a real player played 5 back-to-back, couldn't stop). S6 does **not** rebuild
-what is loved — it **elevates it to a finished product and certifies it** via five ADDITIVE pillars
-(full spec `PLAN.md` v4): causal legibility · Match Story · Heroes · the Hollow One (crowned) · the
-plannable future (+ the Grandmaster skill-gap proof). **No LLM at runtime. No engine rewrite.**
+The loved v3 reconception was elevated to a certified studio release via five ADDITIVE pillars (no engine
+rewrite, no LLM at runtime): **causal legibility · Match Story · Heroes · the Hollow One (crowned) · the
+plannable future**, plus the **Grandmaster proof** that skill beats luck. Council + Fresh-Eyes reviewed,
+hostile-QA certified, all findings applied.
+
+### Final numbers (all gates green)
+- **Band** (random heroes): 2p 53% / 3p 53% / 4p 55% · **per-hero spread 2.4 pts** (≤±8) · **0 softlocks**.
+- **Grandmaster skill gap: +16 @2p** (positive at every count) — skill beats luck, proven on paired seeds.
+- **Referee** H1–H17 + 150 chaos games (2–6p) terminate. **UI-state** 1272 turns, order enforced.
+- `typecheck` ✓ · `build` ✓ · console-check **0 errors** local AND prod.
 
 ## ✅ Done (S6)
 - **WS1** Baseline re-verified green (typecheck ✓ · referee ✓ 150/150 · playtest 2p45/3p55/4p51, 0 softlocks).
@@ -60,14 +66,11 @@ plannable future (+ the Grandmaster skill-gap proof). **No LLM at runtime. No en
   Heroes panel**. a11y: tiles keyboard-navigable (tab/enter, focus=hover), reduced-motion honored. All screens
   screenshot-verified studio-grade. Referee + build + uistate + console-check (0 errors) ✓.
 
-## ▶ NEXT ACTION
-**WS8 — Certification → ship.** (1) Run the Council as subagents (Game Designer · Art Director · Principal
-Engineer · Referee-review · Playtester-read · Fresh-Eyes) + the **🏆 Certification pass** (hostile-QA: 2p & 4p,
-every hero, every ending, tutorial/how-to/select/MatchStory, resize/refresh/sound/reduced-motion; zero open
-defects). Fix findings. (2) **README** = the six-session case study (built→torn down→reconceived→crowned; the
-agent system; the numbers). (3) Deploy prod (`vercel --prod --yes --scope shv-s-projects`; stored login — if
-auth missing, STOP and tell the user). Verify prod with `console-check.mjs` through real gameplay. (4) Print:
-live URL · repo URL · LinkedIn post (my voice) · 100-word hackathon pitch. Final `CLAUDE.md`/`PROGRESS.md`.
+## ▶ NEXT ACTION — none. The game is shipped, certified, and finished.
+Redeploy (after any change): `vercel --prod --yes` (the linked `.vercel/project.json` is authoritative;
+stored login present). Re-verify: run the five gates below + `node scripts/console-check.mjs <url>`.
+Optional future polish (Council's non-blocking design-depth notes): shrink the Gate's sanctuary radius in
+Pitch so it isn't a permanent bunker; sync the three dread-pulse rhythms to one master tempo.
 
 ## S6 verification gates (all green)
 `npm run typecheck` · `npm run build` · `npm run referee` (H1–H17) · `npm run playtest` (band 45–55, spread ≤±8,
