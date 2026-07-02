@@ -21,6 +21,7 @@ export function useGameSound(flash: Flash | null): void {
         break;
       case 'deliver':
       case 'escape':
+      case 'gate-open':
         sound.play('beacon');
         break;
       case 'dark-eat':

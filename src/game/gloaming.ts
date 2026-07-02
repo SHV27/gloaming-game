@@ -2,7 +2,7 @@ import type { Game } from 'boardgame.io';
 import { INVALID_MOVE } from 'boardgame.io/core';
 import type { GState, Player } from './types';
 import { BOARD, GATE_ID, OUTER_RING_IDS, spreadOuter } from './board';
-import { EVENT_DECK, eventById } from './events';
+import { EVENT_DECK, eventById, eventEffectText } from './events';
 import { defaultHeroes, type HeroId } from './heroes';
 import {
   TORCH_START,
@@ -17,6 +17,7 @@ import {
 import {
   log,
   flash,
+  beat,
   burnTorch,
   refuel,
   grabLantern,
@@ -160,6 +161,8 @@ export function makeGloaming(config: GloamingConfig): Game<GState> {
           },
         ],
         logSeq: 1,
+        beats: [],
+        beatSeq: 0,
         flash: null,
         flashSeq: 1,
         hasMarked: markedId !== null,
@@ -249,6 +252,13 @@ export function makeGloaming(config: GloamingConfig): Game<GState> {
             applyEventEffect(G, card, random as RandomAPI);
             flash(G, 'event');
             log(G, `The dark plays a card: ${card.words}.`, card.tone === 'hope' ? 'hope' : 'dread');
+            beat(G, {
+              icon: card.icon,
+              cause: card.words,
+              effect: eventEffectText(card),
+              tone: card.tone === 'hope' ? 'hope' : card.tone === 'calm' ? 'neutral' : 'dread',
+              kind: 'event',
+            });
             G.discard.push(id);
             refreshAct(G);
             retelegraphDark(G, n);
@@ -350,6 +360,7 @@ export function makeGloaming(config: GloamingConfig): Game<GState> {
           if (a.kind !== 'stepThrough' || !a.enabled) return INVALID_MOVE;
           flash(G, 'escape', G.gateId);
           log(G, 'Hand in hand, the bearers step through the Gate — into the dawn. You made it. Together.', 'hope');
+          beat(G, { icon: 'dawn', cause: 'DAWN', effect: 'you all step through — escaped!', tone: 'hope', kind: 'escape' });
           G.acted = true;
           if (!checkGameover(G)) events.endTurn();
         },

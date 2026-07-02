@@ -34,14 +34,23 @@ plannable future (+ the Grandmaster skill-gap proof). **No LLM at runtime. No en
   N→Lantern · in/out of the Hollow One's path · dark-eats-next). Band **52/47/46, spread 3.2, nail 61–85%, 0
   softlocks**. Referee ✓ (H12 rewritten for fray-immunity), build ✓, console-check ✓ 0 errors.
 
+- **WS5** Causal legibility (Pillar 1). `beats: Beat[]` ring-buffer + `beat()` helper; pushed at every cause
+  point (grab/deliver/catch/wisp/rescue/dark/event/act/gate-open/escape/swallowed). Three views, one record:
+  transient **BeatBanner** (cause→effect, e.g. "THE HOLLOW ONE → catches Ash"), last-4 **BeatStrip** ("Just now"
+  panel), + feeds Match Story. **EscapeChecklist** (always-visible in TopBar): 🏮/3 · 👥 atGate · 🔥 lit, each
+  lights when satisfied. **Gate-opening moment**: `gate-open` flash at the 3rd deliver → `GateOpenFlood` light
+  wash + beacon swell + big banner. **Honest forecast**: `darkForecastNextRound` = exact whole-tile bite; the
+  fraying marks show exactly that; Dark gauge reads "−N next round". `eventEffectText` unified in events.ts.
+  Re-verified: band ~53/53/55, spread 2.4, **Grandmaster +16@2p (PASS)**, 0 softlocks; build + console-check ✓.
+
 ## ▶ NEXT ACTION
-**WS5 — Causal legibility.** (1) **Beats**: add `beats: Beat[]` ring-buffer + `beat()` helper; push at cause
-points (grab/deliver/drop/catch/rescue/wisp/dark-eat/event/act/gate-open/escape). Render (a) a transient
-cause→effect **banner**, (b) a last-4 **turn-log strip**. (2) **Escape Checklist** (`EscapeChecklist.tsx`, always
-visible, drawn glyphs): 🏮 N/3 · 👥 atGate/total · 🔥 lit/total — each lights when satisfied. (3) **Gate-opening
-moment**: `gate-open` flash in `deliverAtGate` at the 3rd delivery → light floods + swell + big beat. (4) **Honest
-forecast**: `retelegraphDark` marks EXACTLY the whole-tile bite next round; Dark gauge reads "−N next round".
-Referee + playtest + commit.
+**WS6 — Match Story.** (1) State: `everWisped: boolean` (set in `toWisp`) + `stats {catches,rescues,grabs,
+deliveries,darkEaten,minTilesLeft}` incremented at cause points; track `Lantern.droppedAtRound` for the
+loss-teacher. (2) `MatchStory.tsx` recap (replaces GameOver body): illustrated **timeline** from significant
+`beats`; **tiered named ending** — FLAWLESS DAWN (won, !everWisped) / BY A BREATH (won, dark ≤1 ring or final
+round) / SWALLOWED (loss) / SO CLOSE (loss, 3 delivered); the few **numbers**; on a loss the **loss-teacher**
+(dominant failure). (3) **Play Again** (same heroes, `shell` restart-to-game) + **Change Heroes** (`shell.
+changeHeroes`). Referee H15 (every ending renders) + H17 (gate-open fires once). Commit.
 
 ## ⚠ Balance gotchas (S6 — carry forward)
 - Torch is now **7** (was 8). Frayed step costs **2** (was 1) — reading the fraying telegraph is a real skill;

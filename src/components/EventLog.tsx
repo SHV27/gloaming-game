@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import type { GState, LogTone } from '../game/types';
 import { SEAT_COLORS, TORCH_MAX } from '../game/constants';
 import { heroById } from '../game/heroes';
+import { BeatStrip } from './Beats';
 import { Panel, PanelTitle } from '../ui/Panel';
 
 const TONE_COLOR: Record<LogTone, string> = {
@@ -81,6 +82,15 @@ export function EventLog({ G, currentPlayer }: { G: GState; currentPlayer: strin
           ))}
         </div>
       </Panel>
+
+      {G.beats.length > 0 && (
+        <Panel className="p-3">
+          <PanelTitle>Just now</PanelTitle>
+          <div className="mt-2">
+            <BeatStrip beats={G.beats} />
+          </div>
+        </Panel>
+      )}
 
       <Panel className="flex min-h-0 flex-1 flex-col p-3">
         <PanelTitle>Chronicle</PanelTitle>

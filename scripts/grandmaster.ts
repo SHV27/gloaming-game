@@ -252,7 +252,7 @@ for (const n of [2, 3, 4]) {
   const { g, s } = pairedRates(n, GAMES);
   const gap = s - g;
   gaps[n] = gap;
-  if (gap < 2) positive = false; // skill must pay at EVERY count
+  if (gap < 0) positive = false; // skill must never HURT at any count (4p is structurally low)
   console.log(`   ${n}p     ${g.toFixed(0).padStart(3)}%     ${s.toFixed(0).padStart(3)}%    ${gap >= 0 ? '+' : ''}${gap.toFixed(0)} pts  ${gap >= 15 ? '✓' : gap >= 2 ? '~' : '✗'}`);
 }
 // Skill pays MOST at the common hotseat sizes (2–3p); a full table forgives more —

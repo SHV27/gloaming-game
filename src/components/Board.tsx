@@ -13,6 +13,7 @@ import { GameOver } from './GameOver';
 import { RoleReveal } from './RoleReveal';
 import { Atmosphere } from './Atmosphere';
 import { TopBar } from './TopBar';
+import { BeatBanner } from './Beats';
 import { useGameSound } from '../hooks/useGameSound';
 import { sound } from '../audio/sound';
 import { useShell } from './shell';
@@ -187,16 +188,20 @@ export function GloamingBoard(props: BoardProps<GState>) {
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-void text-parchment">
-      <TopBar />
+      <TopBar G={G} />
 
       <div className="flex min-h-0 flex-1 gap-3 px-3 pb-2">
         {/* the dark gauge */}
         <div className="w-12 py-2">
-          <DarkColumn eaten={G.dark.length} total={total} act={G.act} />
+          <DarkColumn eaten={G.dark.length} total={total} act={G.act} forecast={G.fraying.length} />
         </div>
 
         {/* the board */}
         <div className="relative flex min-w-0 flex-1 items-center justify-center">
+          {/* cause→effect beat banner */}
+          <BeatBanner beats={G.beats} />
+          {/* the Gate throwing open — the win-explainer moment */}
+          <GateOpenFlood flash={G.flash} />
           <motion.div animate={shake} className="relative h-full w-full">
             <svg
               viewBox={`0 0 ${BOARD_W} ${BOARD_H}`}
@@ -416,6 +421,33 @@ export function GloamingBoard(props: BoardProps<GState>) {
         {ctx.gameover && <GameOver gameover={ctx.gameover} G={G} onRestart={shell.restart} />}
       </AnimatePresence>
     </div>
+  );
+}
+
+// ── the Gate opening — a wash of light when the 3rd Lantern lands ──────────────
+function GateOpenFlood({ flash }: { flash: GState['flash'] }) {
+  const [burst, setBurst] = useState(0);
+  const last = useRef(-1);
+  useEffect(() => {
+    if (flash?.kind === 'gate-open' && flash.nonce !== last.current) {
+      last.current = flash.nonce;
+      setBurst((b) => b + 1);
+    }
+  }, [flash]);
+  return (
+    <AnimatePresence>
+      {burst > 0 && (
+        <motion.div
+          key={burst}
+          className="pointer-events-none absolute inset-0 z-20"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: [0, 0.95, 0] }}
+          transition={{ duration: 1.9, ease: 'easeOut' }}
+          onAnimationComplete={() => setBurst(0)}
+          style={{ background: 'radial-gradient(circle at 50% 50%, rgba(255,230,168,0.75) 0%, rgba(240,168,48,0.28) 32%, transparent 62%)' }}
+        />
+      )}
+    </AnimatePresence>
   );
 }
 

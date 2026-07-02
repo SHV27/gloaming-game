@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import type { EventCard as EventCardT, EventTone } from '../game/types';
+import { eventEffectText } from '../game/events';
 
 /**
  * An Event, as an illustrated card — icon + ≤4 words + a one-line effect + a tone.
@@ -11,24 +12,9 @@ const TONE: Record<EventTone, string> = {
   calm: 'var(--color-fog)',
 };
 
-/** A tiny, plain-language effect so a first-timer knows what the card just did. */
-export function effectText(card: EventCardT): string {
-  const a = card.effect.amount ?? 0;
-  switch (card.effect.kind) {
-    case 'torchAll':
-      return a >= 0 ? `every torch +${a}` : `every torch −${-a}`;
-    case 'nightmareStep':
-      return `the Hollow One lurches +${a} step${a === 1 ? '' : 's'}`;
-    case 'darkBite':
-      return `the dark eats +${a} more tile${a === 1 ? '' : 's'}`;
-    case 'lanternFlare':
-      return 'torches near a Lantern flare up';
-    case 'falseDawn':
-      return 'a lost tile flickers back';
-    default:
-      return 'a held breath — nothing stirs';
-  }
-}
+/** A tiny, plain-language effect so a first-timer knows what the card just did.
+ *  (Single source lives in `events.ts` so the card, omen, and beats agree.) */
+export const effectText = eventEffectText;
 
 export function EventGlyph({ icon, color }: { icon: string; color: string }) {
   const common = { fill: 'none', stroke: color, strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };

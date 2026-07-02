@@ -7,6 +7,7 @@ import type {
   EventCard,
   TileAction,
   Act,
+  Beat,
 } from './types';
 import { RING_OF, OUTER_RING } from './board';
 import type { HeroId } from './heroes';
@@ -20,6 +21,7 @@ import {
   MIN_STRIDE,
   LANTERN_COUNT,
   darkBiteFor,
+  darkSlowdownFor,
   actFromDeepestRing,
   ACT_NAMES,
 } from './constants';
@@ -34,6 +36,12 @@ export function log(G: GState, text: string, tone: LogTone = 'neutral'): void {
 }
 export function flash(G: GState, kind: FlashKind, nodeId?: number): void {
   G.flash = { kind, nonce: G.flashSeq++, nodeId };
+}
+/** Record a cause→effect beat — the structured record behind the banner, the
+ *  turn-log strip, and the Match Story (S6, Pillar 1). */
+export function beat(G: GState, b: Omit<Beat, 'id' | 'round'>): void {
+  G.beats.push({ ...b, id: G.beatSeq++, round: G.round });
+  if (G.beats.length > 40) G.beats.shift();
 }
 
 // ── The Torch (your life, a flame) ──────────────────────────────────────────
@@ -58,6 +66,7 @@ export function toWisp(G: GState, p: Player): void {
   dropCarried(G, p, p.nodeId); // a Wisp cannot carry — its Lanterns fall where it stood
   flash(G, 'wisp');
   log(G, `${p.name}'s torch gutters out — they drift now, a Wisp in the dark.`, 'dread');
+  beat(G, { icon: 'frost', cause: p.name, effect: "'s torch goes out — a Wisp now", tone: 'dread', kind: 'wisp', seat: p.seat });
 }
 export function relight(G: GState, rescuer: Player, wispId: string): boolean {
   const t = G.players[wispId];
@@ -72,6 +81,7 @@ export function relight(G: GState, rescuer: Player, wispId: string): boolean {
   t.torch = RELIGHT_TORCH;
   flash(G, 'relight', t.nodeId);
   log(G, `${rescuer.name} cups their hands and breathes ${t.name} back into the light.`, 'fellow');
+  beat(G, { icon: 'lantern', cause: rescuer.name, effect: `relights ${t.name}`, tone: 'fellow', kind: 'rescue', seat: rescuer.seat });
   return true;
 }
 
@@ -89,6 +99,7 @@ export function grabLantern(G: GState, p: Player): boolean {
   refuel(p); // a Lantern is a light source — hoisting it fills your torch (PLAN §B.2)
   flash(G, 'grab', p.nodeId);
   log(G, `${p.name} hoists a Lantern — its warmth fills their torch, though its weight drags.`, 'hope');
+  beat(G, { icon: 'lantern', cause: p.name, effect: 'takes a Lantern · torch full', tone: 'hope', kind: 'grab', seat: p.seat });
   return true;
 }
 /** Drop every Lantern a player carries onto `nodeId` (where they fell / were caught). */
@@ -120,6 +131,20 @@ export function deliverAtGate(G: GState, p: Player): boolean {
     `${p.name} sets ${n > 1 ? n + ' Lanterns' : 'a Lantern'} at the Gate — ${G.lanternsDelivered} of ${LANTERN_COUNT} home.`,
     'hope',
   );
+  beat(G, {
+    icon: 'gate',
+    cause: p.name,
+    effect: `${G.lanternsDelivered}/${LANTERN_COUNT} Lanterns home`,
+    tone: 'hope',
+    kind: 'deliver',
+    seat: p.seat,
+  });
+  // THE GATE OPENS — the win-explainer moment (the third Lantern is home)
+  if (G.lanternsDelivered >= LANTERN_COUNT) {
+    flash(G, 'gate-open', G.gateId);
+    beat(G, { icon: 'dawn', cause: 'THE GATE', effect: 'OPENS — bring everyone home!', tone: 'hope', kind: 'gate-open' });
+    log(G, 'The third Lantern flares to life at the Gate — the way home tears open. Get everyone here, now.', 'hope');
+  }
   return true;
 }
 
@@ -179,6 +204,9 @@ export function eatFrontier(G: GState, k: number): void {
   if (toEat.length === 0) return;
   for (const id of toEat) if (!isVoid(G, id)) G.dark.push(id);
   flash(G, 'dark-eat', toEat[0]);
+  if (toEat.includes(G.gateId))
+    beat(G, { icon: 'crack', cause: 'THE DARK', effect: 'reaches the Gate — swallowed', tone: 'dread', kind: 'swallowed' });
+  else beat(G, { icon: 'crack', cause: 'THE DARK', effect: `eats ${toEat.length} tile${toEat.length > 1 ? 's' : ''}`, tone: 'dread', kind: 'dark' });
 
   for (const p of Object.values(G.players)) {
     if (!isVoid(G, p.nodeId)) continue;
@@ -337,6 +365,14 @@ export function nightmareStep(G: GState): void {
         : `The Hollow One falls on ${p.name} — the cold tears through them and flings them toward the dark.`,
       'dread',
     );
+    beat(G, {
+      icon: 'eye',
+      cause: 'THE HOLLOW ONE',
+      effect: dropped.length ? `catches ${p.name} — Lantern dropped` : `catches ${p.name}`,
+      tone: 'dread',
+      kind: 'catch',
+      seat: p.seat,
+    });
   }
   // telegraph the full route to the next quarry
   retelegraphNightmare(G);
@@ -469,12 +505,17 @@ export function refreshAct(G: GState): Act {
     flash(G, 'act-change');
     const stir = G.act >= 2 ? 'The Hollow One hunts the Lanterns now.' : 'The Hollow One wakes, and quickens.';
     log(G, `${ACT_NAMES[G.act]} falls. ${stir}`, 'dread');
+    beat(G, { icon: 'eye', cause: ACT_NAMES[G.act], effect: G.act >= 2 ? 'it hunts the Lanterns' : 'it wakes, and quickens', tone: 'dread', kind: 'act' });
   }
   return G.act;
 }
+/** The exact whole-tile bite the dark takes next round — the honest forecast the
+ *  Dark gauge reads out, and exactly the tiles it frays (telegraph = truth). */
+export function darkForecastNextRound(G: GState, numPlayers: number): number {
+  return Math.max(1, Math.round(darkBiteFor(G.act, numPlayers) * darkSlowdownFor(G.lanternsDelivered)));
+}
 export function retelegraphDark(G: GState, numPlayers: number): void {
-  const perTurn = darkBiteFor(G.act, numPlayers) / numPlayers;
-  G.fraying = frontierTiles(G, Math.max(2, Math.ceil(perTurn + 0.5)));
+  G.fraying = frontierTiles(G, darkForecastNextRound(G, numPlayers));
 }
 
 // ── win / lose (pure; gloaming.ts endIf wraps this) ─────────────────────────

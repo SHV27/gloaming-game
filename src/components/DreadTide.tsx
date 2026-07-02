@@ -11,10 +11,12 @@ export function DarkColumn({
   eaten,
   total,
   act,
+  forecast,
 }: {
   eaten: number;
   total: number;
   act: Act;
+  forecast: number; // exact tiles the dark eats next round (honest forecast)
 }) {
   const r = Math.min(1, total > 0 ? eaten / total : 0);
   const near = r >= 0.6;
@@ -84,6 +86,11 @@ export function DarkColumn({
         <div className={`font-display text-[10px] uppercase leading-none tracking-wider ${near ? 'text-dread-bright text-glow-dread' : 'text-fog'}`}>
           {ACT_NAMES[act]}
         </div>
+        {/* honest forecast — exactly what the fraying marks show */}
+        <div className="mt-1 font-display text-[11px] leading-none text-dread-bright" title={`The dark eats ${forecast} tile${forecast === 1 ? '' : 's'} next round`}>
+          −{forecast}
+        </div>
+        <div className="font-body text-[7px] leading-tight text-fog-dim">next round</div>
         <div className="mt-0.5 font-body text-[8px] leading-tight text-fog-dim">reaches the Gate = lost</div>
       </div>
     </div>

@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
+import type { GState } from '../game/types';
 import { sound } from '../audio/sound';
 import { useShell } from './shell';
 import { Tutorial } from './Tutorial';
+import { EscapeChecklist } from './EscapeChecklist';
 
-/** Slim header: title, sound toggle, abandon-run. */
-export function TopBar() {
+/** Slim header: title, the Escape Checklist (always-visible win requirements), sound, abandon. */
+export function TopBar({ G }: { G: GState }) {
   const shell = useShell();
   const [muted, setMuted] = useState(sound.muted);
   const [vol, setVol] = useState(sound.volume);
@@ -21,6 +23,9 @@ export function TopBar() {
           trapped inside
         </span>
       </div>
+
+      {/* the always-visible win requirements */}
+      <EscapeChecklist G={G} />
 
       <div className="flex items-center gap-2">
         <button

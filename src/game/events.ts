@@ -31,3 +31,23 @@ export const EVENT_DECK: EventCard[] = [
 export function eventById(id: number): EventCard {
   return EVENT_DECK[id] ?? EVENT_DECK[EVENT_DECK.length - 1];
 }
+
+/** A tiny, plain-language read of what a card DID — the single source shared by the
+ *  illustrated card, the omen, and the cause→effect beat (S6). */
+export function eventEffectText(card: EventCard): string {
+  const a = card.effect.amount ?? 0;
+  switch (card.effect.kind) {
+    case 'torchAll':
+      return a >= 0 ? `every torch +${a}` : `every torch −${-a}`;
+    case 'nightmareStep':
+      return `the Hollow One lurches +${a} step${a === 1 ? '' : 's'}`;
+    case 'darkBite':
+      return `the dark eats +${a} more tile${a === 1 ? '' : 's'}`;
+    case 'lanternFlare':
+      return 'torches near a Lantern flare up';
+    case 'falseDawn':
+      return 'a lost tile flickers back';
+    default:
+      return 'a held breath — nothing stirs';
+  }
+}

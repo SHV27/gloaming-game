@@ -98,6 +98,31 @@ export interface LogEntry {
   tone: LogTone;
 }
 
+// ── Beats — the structured cause→effect record (S6, Pillar 1). One system, three
+//    views: a transient banner, the turn-log strip, and the Match Story timeline. ─
+export type BeatKind =
+  | 'grab'
+  | 'deliver'
+  | 'catch'
+  | 'wisp'
+  | 'rescue'
+  | 'dark'
+  | 'event'
+  | 'act'
+  | 'gate-open'
+  | 'escape'
+  | 'swallowed';
+export interface Beat {
+  id: number;
+  round: number;
+  icon: string; // drawn-glyph key (resolved in UI)
+  cause: string; // short, ALL-CAPS-ish: "COLD SNAP" · "THE HOLLOW ONE" · "THE GATE"
+  effect: string; // short: "every torch −1" · "catches Wren" · "OPENS — escape now"
+  tone: LogTone;
+  kind: BeatKind;
+  seat?: number; // whose beat (for the accent color)
+}
+
 // ── UI cue channel (drives shake / bloom / sound off pure state) ─────────────
 export type FlashKind =
   | 'dice'
@@ -111,6 +136,7 @@ export type FlashKind =
   | 'relight'
   | 'event'
   | 'act-change'
+  | 'gate-open'
   | 'escape';
 export interface Flash {
   kind: FlashKind;
@@ -159,6 +185,8 @@ export interface GState {
 
   log: LogEntry[];
   logSeq: number;
+  beats: Beat[]; // cause→effect record (banner / turn-log strip / Match Story)
+  beatSeq: number;
   flash: Flash | null;
   flashSeq: number;
 
