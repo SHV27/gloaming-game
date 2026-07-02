@@ -1,172 +1,196 @@
-# PLAN.md — GLOAMING v3: *Trapped Inside*
+# PLAN.md — GLOAMING v4: *The Crowning* (Session 6 — the final release)
 
-> **Session 5 — The Reconception.** We are not iterating the euro-puzzle. We go to the root.
-> The v2 build (Ember, Brave/Steady, a Night *meter*, beacons lit by pouring numbers) is a
-> resource-management puzzle wearing a horror coat. There is an **abstraction layer** between the
-> player and the terror. That gap is the "AI slop" smell. We rebuild the body; we keep the soul
-> (dusk art, board-graph renderer, procedural sound, deploy pipeline, hotseat, boardgame.io).
+> **v3 is LOVED.** A real player played five games back-to-back, lost four, won one, and couldn't
+> stop ("kaise jeetun kaise jeetun"). The compulsion loop works; the Nightmare works; the dark works.
+> **Session 6 does not rebuild what is loved — it elevates it to a finished product and certifies it.**
+> All five pillars are **additive**. No engine rewrite. Every §0 anti-regression gotcha is protected.
 >
-> **THE DESIGN LAW (binding for the whole session):**
-> **THE MECHANIC AND THE FANTASY MUST BE THE SAME THING.** Every rule is a *physical thing the
-> player can SEE happen on the board*. If a rule is a hidden number doing math, it has failed —
-> replace it with a thing that moves, grows, shrinks, or gets eaten. (Jumanji: you roll and a lion
-> appears in the room and you run — the rule *is* the story, no layer between.)
+> **THE DIAGNOSIS:** the game is **action-legible** ("what can I do right now" — Fresh-Eyes solved this)
+> but not yet **causally legible** ("*why* did that happen; how close are we; what decision won it").
+> Chess produces strategy because the full state is visible **and every consequence is understood**.
+> Session 6 makes the game as causally legible as chess, gives every match a story, every player an
+> identity, crowns the villain, and certifies the whole thing like a studio release.
 >
-> Two research truths drive every call: **the world teaches itself** (BOTW/Portal — no rulebook,
-> one mechanic at a time, learning *is* play) and **the first 60 seconds decide everything**
-> (≤70% of players quit onboarding — the open must *show what's unique* by *playing*, not reading).
-> **No LLM/Gemini/AI at runtime. The game is 100% self-contained.**
+> **THE RULES-BUDGET LAW (binding):** if a feature needs a paragraph to explain, it's wrong — **one
+> line or it doesn't ship.** Every rule stays a THING YOU SEE (the Design Law, CLAUDE §0).
+> **No LLM/AI at runtime. 100% self-contained.**
 
 ---
 
-## A · The one-breath pitch (fits on the box)
-*You're trapped inside a board game. The dark eats the board from the edges inward. A Nightmare
-walks toward whoever's closest. Grab the three Lanterns, carry them to the Gate, and get everyone
-out together — before the dark reaches the middle. Don't let your torch go out. Don't get caught.
-Don't leave anyone behind.*
+## A · The five pillars (locked)
 
-**Target emotions (design backward):** *dread · togetherness · hope · panic · triumph.*
+1. **CAUSAL LEGIBILITY** — every state change announces its **cause → effect** in one glance, in-world:
+   cause→effect **beats** ("COLD SNAP → all torches −1"), a diegetic **Escape Checklist** (🏮🏮🏮 · 👥 · 🔥),
+   the **Gate-opening moment** (the win-explainer), an **honest dark forecast** (exact tiles next round),
+   a human-readable **turn log** (last 4 beats as icon lines).
+2. **THE MATCH STORY** — record key moments during play; at game end show a **recap screen**: an
+   illustrated timeline of the game's 6–10 key beats, a **tiered named ending** (FLAWLESS DAWN · BY A
+   BREATH · SWALLOWED · SO CLOSE), the few numbers that matter, and — on a loss — **what killed the run**.
+   A big warm **Play Again** + **Change Heroes** close the compulsion loop at its strongest moment.
+3. **THE HEROES** — each player picks a **Hero** with **ONE passive, rule-breaking ability, one line,
+   always visible.** No activation, no cooldown, no new turn step (zero rules-budget cost). They create
+   *complementary* team plans — the fix for the open-co-op "one player solves it alone" trap.
+4. **THE NIGHTMARE, CROWNED** — the villain the player already loves, elevated: it **evolves with the
+   Acts** (a shape in the fog → it wakes → it hunts the Lanterns), telegraphs its **full path**, in
+   **Pitch hunts the nearest bearer**, has **presence** (turns to look, lock-on flourish), and a **name:
+   THE HOLLOW ONE.**
+5. **THE PLANNABLE FUTURE** — strategy needs a visible tomorrow: exact dark forecast (P1) + full
+   Nightmare path (P4) + **The Omen** (next event's *suit* visible, detail hidden) + **what-if on hover**
+   (ghost of the result) + **THE GRANDMASTER TEST** (a smart bot must beat the greedy bot by **≥15 pts**).
 
-## B · Every element is a THING YOU SEE (the five pillars, locked)
-1. **THE DARK — the doom clock, made spatial.** No Night meter. Each round the dark **eats the
-   outermost surviving tiles** (a few per round; more each Act) — the player *watches* the board
-   consumed inward. Tiles about to be eaten **fray/dim (telegraph)**. It herds everyone toward the
-   center → natural rising pressure + a climactic final dash. **Lose = the dark reaches the Gate.**
-2. **THE TORCH — your life, a shrinking flame (0–`TORCH_MAX` notches).** Burns down **1 notch/round**.
-   Moving *through an already-dark (void-adjacent frayed) tile* costs an extra notch. **Refuel to full
-   at a Lantern or the Gate.** Torch → 0 = **WISP** (drifts 1 step toward the Gate, cannot act) until
-   a friend on your tile **Relights** you. No permadeath — Wisp is the softlock floor.
-3. **THE LANTERNS — physical objects you carry (the masterstroke).** 3 Lanterns start on the
-   dangerous **outer ring**. Walk onto one → **Grab** (shown on your token). Carrying makes you move
-   **1 step slower per Lantern carried** (weight = tension; stride floored at 1). Carry to the **Gate**
-   → **Deliver**. Caught / swept by the dark while carrying → you **drop it where you fall** (swept
-   one ring *inward* if the tile is being eaten — always recoverable). Progress = things you *hold and
-   can lose*, not a number.
-4. **THE NIGHTMARE — an embodied hunter (one piece).** Each round it **steps toward the nearest
-   torch** (its next step shown as a glowing footprint = legible menace). Reaching a player → they
-   **drop what they carry, are knocked back one tile toward the Gate, and their torch is snuffed a
-   notch**. One rule = the whole *bait-and-rescue* social game. Faster in later Acts.
-5. **EVENTS — illustrated cards, not paragraphs.** Each round one dramatic thing you *watch*: an
-   **icon + 3–4 words + a visible board effect**. e.g. **THE BRIDGE FALLS** (an extra edge tile
-   crumbles) · **COLD SNAP** (every torch −1) · **THE SWARM** (Nightmare +1 step) · **A GIFT** (a
-   nearby Lantern flares — refuel) · **FALSE DAWN** (one void tile relights — hope). No reading.
-   This replaces the narrator entirely.
+---
 
-## C · Win / Lose
-- **WIN:** every player is **not a Wisp, standing on the Gate, with all 3 Lanterns delivered** —
-  then they **step through together**.
-- **LOSE:** the dark eats the **Gate (center)** — everyone is swallowed. (Win is checked **first**.)
-- **Marked traitor (4+, optional):** the `playerView`/`role` scaffolding stays dormant this session;
-  co-op is the default. For 2–3 the Dark + Nightmare carry all the tension. (Deferred, not cut.)
+## B · THE HEROES — the roster (final call; balance via the Playtester)
 
-## D · The board — a concentric-ring graph (the senior synthesis)
-Keep the graph renderer + BFS; make the graph **rings around a center** so "eaten from the edge
-inward / herded to the middle" is native. Generated programmatically (symmetric, tunable):
-- **Ring 0** — 1 node, **The Gate** (center): refuel + deliver + escape. Dark reaching it = loss.
-- **Ring 1** — 6 nodes. **Ring 2** — 12 nodes. **Ring 3 (outer)** — 12 nodes (Lanterns spawn here).
-- Edges: each node links to its 2 circular ring-neighbors + its nearest node in the adjacent **inner**
-  ring (a spiderweb; every node has a path inward → no unreachable nodes). `ring` + `angle` stored per
-  node for the dark's eat-order and Lantern/Nightmare placement.
-- **Acts are the visible board state:** Dusk (outer ring intact) → Gloaming (outer ring gone, eating
-  ring 2) → Pitch (ring 2 gone, eating ring 1 — the frantic dash). Act = f(deepest surviving ring).
+Five heroes. Each ability is **always-on, passive, visible in play, one line.** 2p picks 2, etc. — the
+pairing is strategy. Lives in `src/game/heroes.ts` (id · name · one-line ability · silhouette motif ·
+accent), shared by engine + UI. `Player.hero: HeroId`.
 
-## E · The turn (the whole rulebook — self-explanatory, order obvious)
-The HUD walks the sequence, one glowing step at a time:
-1. **① ROLL** — the die pulses "roll to move".
-2. **② MOVE** — up to `stride` steps; **legal tiles glow gold**, illegal greyed **with a reason on
-   hover** ("the dark", "too far"). Carrying a Lantern visibly shortens your reach. May stop early.
-3. **③ ACT** — exactly **one obvious glowing button** for what this tile offers:
-   **🔦 Grab Lantern** / **🚪 Step Through the Gate** (enabled only when all 3 delivered & all present)
-   / **🤝 Relight** (a Wisp ally on your tile) / **🔥 Warm at the Gate** (refuel) / else **End Turn**.
-   *End Turn / Warm is ALWAYS legal → a turn can never dead-end.*
-4. **Then you WATCH the board's turn** as an unmissable sequence: the dark eats a bite → the Nightmare
-   takes its step(s) → an **event card flips and animates**.
+| id | name | one line (the whole rule) | engine hook | visible-in-play cue |
+|----|------|---------------------------|-------------|---------------------|
+| `swift` | **THE SWIFT** | *Your stride is always +1.* | `strideFor(+1)` | reaches one ring further — glow shows it |
+| `lamplighter` | **THE LAMPLIGHTER** | *Carrying Lanterns never slows you.* | carry penalty = 0 | full reach even while carrying |
+| `emberheart` | **THE EMBER-HEARTED** | *You can Relight a friend on an adjacent tile.* | relight adjacency | relight button lights for a Wisp one tile away |
+| `unseen` | **THE UNSEEN** | *The Hollow One never hunts you (it can still stumble in).* | excluded from `nightmareGoals` | the path never points at you |
+| `stubborn` | **THE STUBBORN FLAME** | *Your torch burns half as slow (every other round).* | round-burn skips odd rounds | flame visibly steadier / taller |
 
-**Affordance law:** from the screen alone the player can always answer *"what can I do right now, and
-what happens if I do it?"* Legal actions glow; consequences preview on hover/focus; **never a hidden
-legal action, never a dead end.**
+**Complementary play (the anti-solo design):** the Lamplighter runs the far Lantern; the Swift covers
+ground / rescues; the Unseen baits and body-blocks; the Ember-Hearted rescues without stacking; the
+Stubborn Flame takes the deep, slow route. No hero can do it all — the *team* wins.
 
-## F · The Dark automa (per round, at `turn.onEnd`, idempotent)
-1. **EAT** `darkBiteFor(act, numPlayers)` frontier tiles (outermost surviving, deterministic order).
-   A player on an eaten tile → knocked 1 ring inward + torch −`DARK_KNOCK`; a Lantern on it → swept 1
-   ring inward. If the Gate is reached → loss.
-2. **TELEGRAPH** the next bite: mark the next frontier tiles `fraying` (rendered dim/fraying).
-3. **NIGHTMARE STEPS** `nightmareStepsFor(act)` toward the nearest non-Wisp torch (BFS on surviving
-   graph); on contact → drop carried Lanterns + knockback + torch snuff. Telegraph its next step tile.
-4. **EVENT** — flip one illustrated card; apply its visible board effect.
-5. Recompute Act from the deepest surviving ring; on Act change → flash + a wordless act-title.
+**Hero edge cases (Referee, never optional):** Unseen when all others are Wisp → the Hollow One idles
+(legal, no target, no crash). Lamplighter at max carry → stride = roll, fine. Ember-Hearted adjacency
+Relight across the Gate boundary → legal (helps the gather), never a softlock. Abilities never add a
+mid-turn decision. Per-hero win-rate spread ≤ **±8 pts** (no mandatory pick, no trap pick).
 
-## G · Files to touch
-**Engine (WS2):**
-- `board.ts` — **rewrite**: concentric-ring graph generator; `GATE_ID`, `ringOf`, outer-ring/frontier
-  helpers, `EDGES`, `nodeById`, `edgeKey`. New viewBox (≈960×960, centered).
-- `types.ts` — **rewrite** `GState`: `torch` (was ember) + `wisp`; `dark:number[]` (eaten) +
-  `fraying:number[]`; `lanterns:{id,nodeId|null,carriedBy|null,delivered}[]`; `nightmare:{nodeId,nextNodeId}`;
-  `act`; per-turn scratch; log/flash; keep dormant `role`/`secret`. Drop `night/nightMax`, `beacons`,
-  `sealedEdges`, omen/Brave types, Stalker/intents.
-- `constants.ts` — `TORCH_START/MAX`, `MOVE_DARK_COST`, `DARK_KNOCK`, `darkBiteFor`, `nightmareStepsFor`,
-  `LANTERN_CARRY_STRIDE_PEN`, `RELIGHT`, ring sizes, Act mapping, per-count scaling.
-- `effects.ts` — **rewrite**: `burnTorch/refuel/toWisp/relight`, `grabLantern/deliverLantern/dropLanterns`,
-  `eatFrontier/telegraphDark/sweepInward`, `nightmareStep`, `applyEventEffect`, `legalMoves`,
-  `getTileAction` (the single ③ button source shared by HUD + move), `checkGameover` (win first).
-- `events.ts` — **rewrite** as ~14+ **illustrated cards**: `{id, icon, words(≤4), effect, tone}`; no prose.
-- `gloaming.ts` — moves `rollStride / moveTo / grab / deliver / relight / warm / stepThrough / endTurn`;
-  `onBegin` (burn torch, Wisp auto-drift); `onEnd` (the Dark automa §F); `playerView` (dormant role);
-  `endIf`. Cut `brave/steady/kindle/sow/castOut` (or keep castOut dormant).
-- **DELETE** `narrator.ts` + `api/narrate.ts` + all Gemini/env narrator deps.
+---
 
-**UI (WS3/4/7):**
-- `TurnHud.tsx` — **rewrite** to the ①②③ walker: roll, one ACT button, carry indicator, torch flame,
-  Wisp state, "who has what / who's out" party roster, the dark's proximity read.
-- `Board.tsx` — **rewrite**: rings; **the dark eating** (void spread + fraying tiles = centerpiece);
-  Lanterns (glow, sit heavy when carried, scatter light); the **Nightmare** + glowing next-step
-  footprint; the Gate pulses when 3 delivered; torches gutter low; legal-move glow + greyed-with-reason.
-- `DreadTide.tsx`→**cut/replace** (the shrinking board *is* the clock; a thin "how close is the dark"
-  read only). `EventLog.tsx`→**EventCard** (illustrated flip). `GameOver.tsx`, `Dice.tsx`, `TopBar.tsx`,
-  `SetupScreen.tsx`, `Tutorial.tsx` (teach-by-playing), `GameMount.tsx`, `Atmosphere.tsx` reworked to rings.
-- `sound.ts`/`useGameSound.ts` — cues: roll, step, grab, deliver(chime), dark-eat(low crumble),
-  nightmare-step(dread tick), snuff, wisp, relight, event-flip, act-change, escape(triumph).
+## C · THE NIGHTMARE, CROWNED — *The Hollow One*
 
-**Onboarding (WS5):** `Splash.tsx` (SHV Studios embers→title), `ColdOpen.tsx` (wordless ~15s), the
-teach-by-playing first turn (die pulse → tile glow → Lantern sparkle → watch the dark eat 1 + Nightmare
-step 1), a one-screen illustrated **How-to-Play** card.
+- **Name** revealed in-world (how-to + the fog + act titles). One identity, consistent.
+- **Act evolution (visible, zero new rules):** *Dusk* — a shape in the fog (small, dim eye, slow tick).
+  *The Gloaming* — it **wakes** (brighter eyes, quicker pulse, larger). *Pitch* — it **hunts** (biggest,
+  fiercest, fastest; targets bearers).
+- **Full path telegraph:** `nightmare.path: number[]` = its whole intended route (up to 4 steps) toward
+  its goal, drawn as a fading trail of footfalls. **Retargets redraw** → players *see it change its mind*.
+- **Pitch bearer-hunting:** in Act 2, goals prefer the nearest **Lantern-bearer** (fallback: nearest
+  torch; fallback: idle). One line on the telegraph: *"its gaze locks on the Lantern."* The climax is
+  now "protect the carrier." **Referee:** the targeting switch can never strand the Hollow One (fallback
+  chain) and can never enter/rest on the warded Gate.
+- **Presence (pure theatre):** it faces its target (rotates toward the next step); a half-second
+  **lock-on** flourish when the target changes; tick/pulse deepens per Act; the fog leans toward it.
 
-**Quality (WS6):**
-- `scripts/referee.ts` — **rewrite** assertions over the real reducer for every §H case.
-- `scripts/playtest.ts` — **rewrite** headless sim: length ~20–30 min equiv, win-rate ~45–55%,
-  comebacks, nail-biter rate, **dead-turn ≈ 0**, per player count.
+---
 
-## H · Edge cases the Referee must prove (invariant: always a legal action OR auto-resolve — never a softlock/crash)
+## D · CAUSAL LEGIBILITY — the systems
+
+- **Beats (`beats: Beat[]`, ring buffer ~40).** `beat(G, {icon, cause, effect, tone, kind})` pushed at
+  every cause point (grab, deliver, drop, catch, rescue, wisp, dark-eat-with-victims, event, act-change,
+  gate-open, near-miss, escape). The prose `log` stays for the chronicle side panel; **beats** power (a)
+  the transient **cause→effect banner** (newest, ~2.6s), (b) the **turn-log strip** (last 4, icon lines),
+  and (c) the **Match Story** timeline (significant kinds). One structured source, three views.
+- **Escape Checklist** (`EscapeChecklist.tsx`, always visible, diegetic drawn glyphs — no emoji):
+  🏮 `lanternsDelivered/3` · 👥 `atGate/total` · 🔥 `lit/total` (each lights when satisfied). Answers
+  "what do we still need?" in half a second.
+- **Gate-opening moment:** new flash `gate-open` fired in `deliverAtGate` when delivered hits 3 → the
+  Gate archway floods with light + rays + a swelling chord + a big beat "THE GATE OPENS." The missing
+  win-explainer.
+- **Honest forecast:** `darkForecastNextRound(G, n)` = the exact whole-tile bite next round; `fraying`
+  marks exactly that many tiles and the Dark gauge reads "−N next round." Fully plannable.
+
+---
+
+## E · THE MATCH STORY — the recap (`MatchStory.tsx`, replaces GameOver's body)
+
+- **Timeline:** the game's key beats as an illustrated strip, ending on the decisive one.
+- **Ending tiers (named):** **FLAWLESS DAWN** (won, `!everWisped`) · **BY A BREATH** (won, dark ≤1 ring
+  from the Gate *or* the final possible round) · **SWALLOWED** (loss) · **SO CLOSE** (loss, 3 delivered).
+- **Numbers that matter (few):** rounds survived · tiles lost to the dark · catches · rescues · closest
+  call. Tracked in `stats` counters, incremented at cause points.
+- **Loss-teacher:** on defeat, name what killed the run (dominant failure: an unrecovered dropped Lantern
+  + the round it fell / a torch collapse into Wisps / the Hollow One kept you off the Lanterns).
+- **Play Again** (same heroes) + **Change Heroes** (back to select). **Referee:** Match Story renders for
+  every ending type.
+- State additions: `everWisped: boolean`, `stats: {catches, rescues, grabs, deliveries, darkEaten,
+  closestRing}`, and lantern drop bookkeeping for the loss-teacher.
+
+---
+
+## F · THE PLANNABLE FUTURE
+
+- **The Omen:** derive the next card from `G.deck` top; show a **face-down card with only its suit** —
+  ☠ cruel (`dread`) · ✦ kind (`hope`) · ⚡ wild (`calm`). Telegraphed-but-uncertain (our thrill pattern).
+- **What-if on hover/focus:** hovering a reachable tile shows a silent ghost: *"land here · N to a Lantern
+  · in/out of the Hollow One's path."* Instant, optional; invisible to those who don't look. No perf hit
+  (computed on hover only).
+- **THE GRANDMASTER TEST (`scripts/playtest.ts`):** a second **smart bot** that plans 1–2 rounds ahead
+  (protects/escorts bearers, pre-positions rescues, baits the Hollow One off carriers, avoids frayed
+  tiles unless forced, refuels before guttering, reads the forecast + path). Print greedy vs smart
+  win-rate per count and require **smart ≥ greedy + 15 pts** at the same tuning. Objective proof that
+  skill — not luck — wins.
+
+---
+
+## G · UI-STATE MACHINE + interaction correctness (§7)
+
+- **Formal turn phase** `turnPhase(G, ctx, myTurn) → 'watch' | 'roll' | 'move' | 'act' | 'resolving'`
+  (pure). Exactly the right controls enabled per phase; everything else visibly disabled-with-reason;
+  controls never flash / reorder / arrive late. A subtle "skip theatre" for the WATCH sequence.
+- **UI-state tests (`scripts/uistate.ts`, vite-node):** for each phase, assert the enabled control set
+  matches the contract (preRoll → only Roll; move/act → move + the single ③ action + End Turn; watch/not-
+  your-turn → none). Button-sequence bugs become structurally impossible, like softlocks did.
+
+---
+
+## H · Edge cases the Referee MUST prove (invariant: always a legal action OR auto-resolve — never a softlock/crash)
+
+*(v3 cases 1–11 remain binding — see the list below — plus Session-6 additions.)*
 1. Torch → 0 mid-turn → Wisp; turn completes.
 2. *All* players Wisps → drift to Gate, dark keeps eating, ends by dark-reaches-Gate (no hang).
-3. No legal *move* (surrounded by void / stride 0) → **End Turn / Warm** still legal; turn passes.
-4. A Lantern on a tile the dark then eats → **swept one ring inward** (recoverable) — never lost, or a graceful loss.
+3. No legal *move* (surrounded / stride 0) → **End Turn / Warm** still legal; turn passes.
+4. A Lantern on a tile the dark eats → **swept one ring inward** (recoverable) — never lost.
 5. Dark reaches the Gate mid-resolution → immediate clean **loss**.
-6. 3rd Lantern delivered **and** the dark reaches the Gate on the same resolution → **win checked first**.
+6. 3rd Lantern delivered **and** dark reaches the Gate same resolution → **win checked first**.
 7. Two players hit 0 torch simultaneously → both Wisp; no double-resolve.
-8. Refresh / remount mid-turn → state rehydrates; current player still has a legal action.
+8. Refresh / remount mid-turn → rehydrates; current player still has a legal action.
 9. The Nightmare and the dark hit the same player the same round → resolves once, deterministic.
-10. Carrying two Lanterns and getting caught → **both drop** correctly (onto valid, non-void tiles).
-11. `endTurn` is always offered; `stepThrough` only when all 3 delivered **and** every non-Wisp is on the Gate.
+10. Carrying two Lanterns and getting caught → **both drop** (onto valid, non-void tiles).
+11. `endTurn` always offered; `stepThrough` only when 3 delivered **and** every non-Wisp is on the Gate.
+- **H12 (Unseen)** all non-Wisp players are Unseen → the Hollow One has no goal → idles (no crash).
+- **H13 (Pitch targeting)** Act 2 with no bearer → falls back to nearest torch; with none → idles.
+- **H14 (Ember-Hearted)** adjacency Relight (incl. across the Gate boundary) → legal, no softlock.
+- **H15 (Match Story)** every ending type (FLAWLESS/BREATH/SWALLOWED/SO CLOSE) produces a valid recap.
+- **H16 (UI-state)** every phase exposes exactly its contract's controls (via `scripts/uistate.ts`).
+- **H17 (Gate-opening)** the `gate-open` beat fires exactly once, on the delivery that reaches 3.
 
-## I · The tests that prove it works
-- `typecheck` + `build` clean; dev server **zero console errors** (`scripts/console-check.mjs`).
-- `npm run referee` green across all of §H.
-- `npm run playtest`: **length ~20–30 min equiv**, **win-rate ~45–55%** per count, comebacks present,
-  **dead-turn ≈ 0** (rescuable-Wisp turns may be excluded — dramatic, not empty), nail-biters common.
-- **Fresh-Eyes agent** (shown only the screen, no rules) states a correct legal action + consequence each turn.
-- A human plays 2-player end-to-end: understands a turn in the first minute unaided, never softlocks,
-  the dark visibly closes in, reaches a frantic climax, ~20–30 min.
+## I · The tests that prove it works (run after EVERY workstream)
+- `typecheck` + `build` clean; dev server **zero console errors** (`scripts/console-check.mjs`) — local AND prod.
+- `npm run referee` green across all of §H (incl. H12–H17).
+- `npm run playtest`: **win-rate 45–55%** per count **with random heroes in play**; per-hero spread **≤±8
+  pts**; **nail-biters ≥70%**; **dead-turn ≈ 0**; **0 softlocks**; **Grandmaster gap ≥ +15 pts**.
+- `npm run uistate` green (the interaction-state contract).
+- **Fresh-Eyes agent** (screen only, no rules) states a correct action + consequence each turn, AND can
+  answer "what does the team still need to win" from the Escape Checklist.
+- **Certification pass:** a hostile-QA subagent plays the real build — 2p & 4p, every hero once, every
+  ending type, tutorial + how-to + select + Match Story exercised, resize/refresh/sound/reduced-motion —
+  **zero open defects = certified.**
 
-## J · Senior calls locked (where the brief left a gap)
-- **Concentric-ring graph**, not a new grid engine — keeps the renderer/BFS, makes "eaten inward /
-  herded to center" native, and ties Acts to the visible board.
-- **The center is ONE place — The Gate:** home + refuel + deliver + escape. One concept teaches faster;
-  the dark racing you to the one safe tile is the tightest possible theme.
-- **The Dark eats `k` frontier tiles/round** (granular, telegraphed, tunable) rather than a whole ring
-  instantly — more "I can see it coming," and simulable.
-- **Torch = a flame with notches** (keeps the Wisp/Relight softlock cure), **Lanterns = carried objects**
-  (replaces beacon-pour tug-of-war with a physical carry-and-drop tug-of-war).
-- **No Brave/Steady dilemma:** tension is now *spatial* (who grabs the far Lantern before the dark eats
-  it, who baits the Nightmare, who rescues the Wisp). The abstract gamble is gone by design.
-- **Marked traitor deferred** (scaffolding dormant), AI narrator **deleted** — 100% self-contained.
+## J · Workstreams (commit + checkpoint after each; Referee + Playtest re-run each time)
+1. **WS1** ✅ baseline verified green; PLAN v4 + CLAUDE.md updated.
+2. **WS2 Heroes** — `heroes.ts`; engine hooks; `HeroSelect.tsx`; visible cues; playtest w/ random heroes + per-hero spread; referee H12/H14.
+3. **WS3 The Hollow One** — `nightmare.path`; Pitch bearer-hunting; act evolution + presence + name; referee H13; re-balance.
+4. **WS4 Plannable future** — Omen suit; what-if hover; the **Grandmaster smart bot** + prove ≥15-pt gap; tune.
+5. **WS5 Causal legibility** — beats + banner + turn-log strip; Escape Checklist; Gate-opening moment; honest forecast.
+6. **WS6 Match Story** — moment/stats recorder; recap screen; ending tiers; loss-teacher; Play Again / Change Heroes; referee H15/H17.
+7. **WS7 UI-state machine + tests** (`uistate.ts`, H16), final art/juice, performance, **finished onboarding** (scripted first turn + heroes how-to panel).
+8. **WS8 Certification → ship** — Council + Fresh-Eyes + hostile-QA; README case study; deploy; LinkedIn + hackathon pitch.
+
+## K · Senior calls locked
+- **Everything additive.** No new engine; extend `GState` once (hero, beats, stats, everWisped, nightmare.path)
+  then wire incrementally. The loved core (dark automa, Grab-refuels, Gate-sanctuary, sweep-outward,
+  win-before-loss, `getTileAction` single source, Framer transform-not-attribute) is untouched.
+- **Beats are one system, three views** (banner / strip / Match-Story) — no duplicate recorders.
+- **Heroes are pure passive flags** — the only safe way to add identity without touching the turn or the
+  softlock cures.
+- **The Grandmaster gap is the north star of tuning** — the new legibility (forecast, full path, omen)
+  and Pitch bearer-hunting are precisely what make foresight *pay*, so the gap should emerge from design.
