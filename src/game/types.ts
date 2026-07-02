@@ -42,6 +42,7 @@ export interface Lantern {
   nodeId: number | null; // sitting on this tile, or null while carried
   carriedBy: string | null; // player id carrying it, or null
   delivered: boolean; // reached the Gate
+  droppedAtRound: number | null; // last round it was dropped (for the loss-teacher); null once recovered
 }
 
 // ── The Hollow One — an embodied hunter that walks toward the nearest torch ───
@@ -150,6 +151,15 @@ export interface GameoverState {
   reason: 'escaped' | 'swallowed';
 }
 
+// ── Match Story stats (S6, Pillar 2) — the few numbers that matter ───────────
+export interface GStats {
+  catches: number; // times the Hollow One caught someone
+  rescues: number; // relights
+  grabs: number; // Lanterns grabbed
+  darkEaten: number; // tiles the dark ate
+  minTilesLeft: number; // the closest call — fewest surviving tiles at any moment
+}
+
 // ── The whole game state ─────────────────────────────────────────────────────
 export interface GState {
   players: Record<string, Player>;
@@ -189,6 +199,10 @@ export interface GState {
   beatSeq: number;
   flash: Flash | null;
   flashSeq: number;
+
+  // Match Story record (S6)
+  everWisped: boolean; // did any bearer ever gutter out? (FLAWLESS DAWN gate)
+  stats: GStats;
 
   // dormant hidden-role scaffolding (4+)
   hasMarked: boolean;

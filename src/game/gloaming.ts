@@ -120,6 +120,7 @@ export function makeGloaming(config: GloamingConfig): Game<GState> {
         nodeId,
         carriedBy: null,
         delivered: false,
+        droppedAtRound: null,
       }));
 
       // the Nightmare wakes on the outer ring, away from the Lanterns, and walks in
@@ -165,6 +166,8 @@ export function makeGloaming(config: GloamingConfig): Game<GState> {
         beatSeq: 0,
         flash: null,
         flashSeq: 1,
+        everWisped: false,
+        stats: { catches: 0, rescues: 0, grabs: 0, darkEaten: 0, minTilesLeft: nodes.length },
         hasMarked: markedId !== null,
         secret: { markedId },
       };

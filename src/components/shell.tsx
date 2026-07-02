@@ -10,6 +10,8 @@ export interface ShellApi {
   gotoSeat: (seat: string) => void;
   /** Full reset — back to setup. */
   restart: () => void;
+  /** Same roster + heroes, a brand-new game (Match Story → Play Again). */
+  playAgain: () => void;
   /** Keep the roster, return to hero select for a fresh run (Match Story). */
   changeHeroes: () => void;
 }

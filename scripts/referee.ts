@@ -23,7 +23,10 @@ import {
   getTileAction,
   relight,
   stepTorchCost,
+  deliverAtGate,
 } from '../src/game/effects';
+import { matchVerdict } from '../src/game/story';
+import type { GameoverState } from '../src/game/types';
 import { RING_OF, OUTER_RING, GATE_ID } from '../src/game/board';
 import { LANTERN_COUNT } from '../src/game/constants';
 
@@ -397,6 +400,48 @@ section('The Hollow One path telegraph is coherent');
   const path = G.nightmare.path;
   assert(path.length === 0 || path[0] === G.nightmare.nextNodeId, 'path[0] equals the telegraphed next step');
   assert(path.every((id) => !isVoid(G, id) && id !== GATE_ID), 'the route never crosses the void or the warded Gate');
+}
+
+// ── §H.15 — the Match Story renders a valid verdict for EVERY ending ──────────
+section('Match Story: a named verdict for every ending (H15)');
+{
+  const mk = (setup: (G: GState) => void, go: GameoverState) => {
+    const G = freshG(2);
+    setup(G);
+    return matchVerdict(G, go);
+  };
+  const flawless = mk((G) => { G.everWisped = false; G.lanternsDelivered = LANTERN_COUNT; }, { winner: 'bearers', reason: 'escaped' });
+  assert(flawless.tier === 'flawless' && flawless.title.length > 0 && !flawless.lossReason, 'no-Wisp win → FLAWLESS DAWN');
+  const breath = mk((G) => { G.everWisped = true; G.lanternsDelivered = LANTERN_COUNT; }, { winner: 'bearers', reason: 'escaped' });
+  assert(breath.tier === 'breath' && breath.title.length > 0, 'win after a Wisp → BY A BREATH');
+  const soClose = mk((G) => { G.lanterns.forEach((l) => (l.delivered = true)); G.lanternsDelivered = LANTERN_COUNT; }, { winner: 'dark', reason: 'swallowed' });
+  assert(soClose.tier === 'soclose' && !!soClose.lossReason, 'loss with 3 delivered → SO CLOSE + a lesson');
+  const swallowed = mk((G) => { G.lanternsDelivered = 1; G.lanterns[1].droppedAtRound = 5; }, { winner: 'dark', reason: 'swallowed' });
+  assert(swallowed.tier === 'swallowed' && !!swallowed.lossReason, 'loss with <3 delivered → SWALLOWED + a lesson');
+}
+
+// ── §H.17 — the Gate opens exactly once, on the 3rd delivery ──────────────────
+section('The Gate opens exactly once, on the 3rd delivery (H17)');
+{
+  const G = freshG(2);
+  const p = G.players['0'];
+  p.nodeId = GATE_ID;
+  G.lanterns[0].delivered = true;
+  G.lanterns[1].delivered = true;
+  G.lanternsDelivered = 2;
+  G.lanterns[2].carriedBy = p.id;
+  G.lanterns[2].nodeId = null;
+  p.carrying = [2];
+  const before = G.beats.filter((b) => b.kind === 'gate-open').length;
+  deliverAtGate(G, p);
+  const after = G.beats.filter((b) => b.kind === 'gate-open').length;
+  assert(after - before === 1, 'delivering the 3rd Lantern fires exactly one gate-open beat');
+  assert(G.flash?.kind === 'gate-open', 'a gate-open flash is raised on the 3rd delivery');
+  const q = G.players['1'];
+  q.nodeId = GATE_ID;
+  q.carrying = [];
+  deliverAtGate(G, q); // nothing to deliver → no new gate-open
+  assert(G.beats.filter((b) => b.kind === 'gate-open').length === after, 'no extra gate-open after the 3rd');
 }
 
 // ── verdict ──────────────────────────────────────────────────────────────────

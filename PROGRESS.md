@@ -43,14 +43,23 @@ plannable future (+ the Grandmaster skill-gap proof). **No LLM at runtime. No en
   fraying marks show exactly that; Dark gauge reads "−N next round". `eventEffectText` unified in events.ts.
   Re-verified: band ~53/53/55, spread 2.4, **Grandmaster +16@2p (PASS)**, 0 softlocks; build + console-check ✓.
 
+- **WS6** Match Story (Pillar 2). State: `everWisped` + `stats {catches,rescues,grabs,darkEaten,minTilesLeft}`
+  incremented at cause points; `Lantern.droppedAtRound` for the loss-teacher. Pure `story.ts` (`matchVerdict`/
+  `matchTimeline`/`matchNumbers`/`lossTeacher`). `MatchStory.tsx` recap (replaces GameOver): **tiered named
+  ending** — FLAWLESS DAWN (!everWisped) / BY A BREATH (won after a Wisp) / SO CLOSE (loss, 3 delivered) /
+  SWALLOWED — illustrated **timeline** of key beats, the few **numbers**, and on a loss the **loss-teacher**.
+  **Play Again** (same heroes → `shell.playAgain`) + **Change Heroes** + **New Party**. `GameOver.tsx` deleted.
+  Referee **H15** (every ending → valid verdict) + **H17** (gate-open fires once) ✓; band/spread/softlocks ✓;
+  build ✓.
+
 ## ▶ NEXT ACTION
-**WS6 — Match Story.** (1) State: `everWisped: boolean` (set in `toWisp`) + `stats {catches,rescues,grabs,
-deliveries,darkEaten,minTilesLeft}` incremented at cause points; track `Lantern.droppedAtRound` for the
-loss-teacher. (2) `MatchStory.tsx` recap (replaces GameOver body): illustrated **timeline** from significant
-`beats`; **tiered named ending** — FLAWLESS DAWN (won, !everWisped) / BY A BREATH (won, dark ≤1 ring or final
-round) / SWALLOWED (loss) / SO CLOSE (loss, 3 delivered); the few **numbers**; on a loss the **loss-teacher**
-(dominant failure). (3) **Play Again** (same heroes, `shell` restart-to-game) + **Change Heroes** (`shell.
-changeHeroes`). Referee H15 (every ending renders) + H17 (gate-open fires once). Commit.
+**WS7 — UI-state machine + tests, final art/juice, finished onboarding.** (1) `turnPhase(G,ctx,myTurn) →
+'watch'|'roll'|'move'|'act'|'resolving'` pure fn; assert per-phase enabled controls in `scripts/uistate.ts`
+(`npm run uistate`, referee H16) — button-order bugs structurally impossible. (2) Scripted **teach-by-playing
+first turn** (`Coach.tsx`): coachmarks over the real first turn (roll → glowing tile → grab → watch dark+Hollow
+One → checklist pulses), skippable/re-openable. (3) How-to **+ a Heroes panel**. (4) Final art/juice pass
+(Gate-open, act transitions, Hollow One evolution get the big juice), a11y (reduced-motion/keyboard/contrast),
+perf, **0 console errors local**. Commit.
 
 ## ⚠ Balance gotchas (S6 — carry forward)
 - Torch is now **7** (was 8). Frayed step costs **2** (was 1) — reading the fraying telegraph is a real skill;

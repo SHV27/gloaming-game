@@ -29,6 +29,10 @@ export default function App() {
         setSeat('0');
         setRunId((r) => r + 1);
       },
+      playAgain: () => {
+        setSeat('0');
+        setRunId((r) => r + 1);
+      },
       changeHeroes: () => {
         setHeroes(null);
         setSeat('0');

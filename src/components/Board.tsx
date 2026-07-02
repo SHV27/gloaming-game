@@ -9,7 +9,7 @@ import { boardFilter, DarkColumn } from './DreadTide';
 import { TurnHud } from './TurnHud';
 import { EventLog } from './EventLog';
 import { HandoffScreen } from './HandoffScreen';
-import { GameOver } from './GameOver';
+import { MatchStory } from './MatchStory';
 import { RoleReveal } from './RoleReveal';
 import { Atmosphere } from './Atmosphere';
 import { TopBar } from './TopBar';
@@ -416,9 +416,17 @@ export function GloamingBoard(props: BoardProps<GState>) {
         )}
       </AnimatePresence>
 
-      {/* game over */}
+      {/* game over — the Match Story recap */}
       <AnimatePresence>
-        {ctx.gameover && <GameOver gameover={ctx.gameover} G={G} onRestart={shell.restart} />}
+        {ctx.gameover && (
+          <MatchStory
+            gameover={ctx.gameover}
+            G={G}
+            onPlayAgain={shell.playAgain}
+            onChangeHeroes={shell.changeHeroes}
+            onRestart={shell.restart}
+          />
+        )}
       </AnimatePresence>
     </div>
   );

@@ -63,6 +63,7 @@ export function toWisp(G: GState, p: Player): void {
   if (p.wisp) return;
   p.wisp = true;
   p.torch = 0;
+  G.everWisped = true;
   dropCarried(G, p, p.nodeId); // a Wisp cannot carry — its Lanterns fall where it stood
   flash(G, 'wisp');
   log(G, `${p.name}'s torch gutters out — they drift now, a Wisp in the dark.`, 'dread');
@@ -79,6 +80,7 @@ export function relight(G: GState, rescuer: Player, wispId: string): boolean {
   if (t.nodeId !== rescuer.nodeId && !adjacent) return false;
   t.wisp = false;
   t.torch = RELIGHT_TORCH;
+  G.stats.rescues++;
   flash(G, 'relight', t.nodeId);
   log(G, `${rescuer.name} cups their hands and breathes ${t.name} back into the light.`, 'fellow');
   beat(G, { icon: 'lantern', cause: rescuer.name, effect: `relights ${t.name}`, tone: 'fellow', kind: 'rescue', seat: rescuer.seat });
@@ -95,7 +97,9 @@ export function grabLantern(G: GState, p: Player): boolean {
   if (!l) return false;
   l.nodeId = null;
   l.carriedBy = p.id;
+  l.droppedAtRound = null; // recovered
   p.carrying.push(l.id);
+  G.stats.grabs++;
   refuel(p); // a Lantern is a light source — hoisting it fills your torch (PLAN §B.2)
   flash(G, 'grab', p.nodeId);
   log(G, `${p.name} hoists a Lantern — its warmth fills their torch, though its weight drags.`, 'hope');
@@ -109,6 +113,7 @@ export function dropCarried(G: GState, p: Player, nodeId: number): number[] {
     const l = G.lanterns.find((x) => x.id === id)!;
     l.carriedBy = null;
     l.nodeId = nodeId;
+    l.droppedAtRound = G.round; // for the loss-teacher (never-recovered drops)
   }
   p.carrying = [];
   return dropped;
@@ -121,6 +126,7 @@ export function deliverAtGate(G: GState, p: Player): boolean {
     l.carriedBy = null;
     l.nodeId = G.gateId;
     l.delivered = true;
+    l.droppedAtRound = null; // home safe
   }
   p.carrying = [];
   refuel(p); // the Gate's warmth
@@ -203,6 +209,8 @@ export function eatFrontier(G: GState, k: number): void {
   const toEat = frontierTiles(G, k);
   if (toEat.length === 0) return;
   for (const id of toEat) if (!isVoid(G, id)) G.dark.push(id);
+  G.stats.darkEaten += toEat.length;
+  G.stats.minTilesLeft = Math.min(G.stats.minTilesLeft, G.nodes.length - G.dark.length);
   flash(G, 'dark-eat', toEat[0]);
   if (toEat.includes(G.gateId))
     beat(G, { icon: 'crack', cause: 'THE DARK', effect: 'reaches the Gate — swallowed', tone: 'dread', kind: 'swallowed' });
@@ -354,6 +362,7 @@ export function nightmareStep(G: GState): void {
   if (step !== null && step !== G.gateId) G.nightmare.nodeId = step;
   flash(G, 'nightmare', G.nightmare.nodeId);
   for (const p of nonWisp(G).filter((q) => q.nodeId === G.nightmare.nodeId && q.nodeId !== G.gateId)) {
+    G.stats.catches++;
     const dropped = dropCarried(G, p, p.nodeId);
     burnTorch(G, p, NIGHTMARE_SNUFF);
     flash(G, 'snuff', p.nodeId);
