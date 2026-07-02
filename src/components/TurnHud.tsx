@@ -45,7 +45,7 @@ export function TurnHud({
   const lanternsLeft = LANTERN_COUNT - G.lanternsDelivered;
   const goal =
     lanternsLeft > 0
-      ? `Carry ${lanternsLeft} more Lantern${lanternsLeft === 1 ? '' : 's'} to the Gate.`
+      ? `Bring the Lanterns to the Gate — ${G.lanternsDelivered}/${LANTERN_COUNT} home.`
       : 'All Lanterns home — gather everyone at the Gate and step through!';
 
   const doAction = (a: TileAction) => {

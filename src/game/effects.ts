@@ -134,6 +134,16 @@ export function deepestSurvivingRing(G: GState): number {
   for (const n of G.nodes) if (!isVoid(G, n.id) && RING_OF[n.id] > deepest) deepest = RING_OF[n.id];
   return deepest;
 }
+/** A surviving tile one ring OUTWARD (toward the dark) — the Nightmare shoves you
+ *  here, away from the safe center. Falls back to staying put if the edge is void. */
+export function sweepOutward(G: GState, fromId: number): number {
+  const here = RING_OF[fromId];
+  const neigh = G.nodes[fromId].neighbors.filter((m) => !isVoid(G, m) && m !== G.gateId);
+  const outer = neigh.filter((m) => RING_OF[m] > here).sort((a, b) => RING_OF[b] - RING_OF[a]);
+  if (outer.length) return outer[0];
+  if (neigh.length) return neigh.sort((a, b) => RING_OF[b] - RING_OF[a])[0];
+  return fromId; // ringed in by void — no shove
+}
 /** Nearest surviving tile one ring inward (used to sweep occupants of an eaten tile). */
 export function sweepInward(G: GState, fromId: number): number {
   const here = RING_OF[fromId];
@@ -260,16 +270,12 @@ export function nightmareStep(G: GState): void {
     const dropped = dropCarried(G, p, p.nodeId);
     burnTorch(G, p, NIGHTMARE_SNUFF);
     flash(G, 'snuff', p.nodeId);
-    if (!p.wisp) {
-      // knocked back a tile, but never shoved into the safe Gate (that's a reward, not a hit)
-      const back = sweepInward(G, p.nodeId);
-      p.nodeId = back === G.gateId ? p.nodeId : back;
-    }
+    if (!p.wisp) p.nodeId = sweepOutward(G, p.nodeId); // shoved OUT toward the dark, away from home
     log(
       G,
       dropped.length
-        ? `The Nightmare falls on ${p.name} — they drop everything and reel back into the dark.`
-        : `The Nightmare falls on ${p.name} — the cold tears through them and they reel back.`,
+        ? `The Nightmare falls on ${p.name} — they drop everything and are flung back toward the dark.`
+        : `The Nightmare falls on ${p.name} — the cold tears through them and flings them toward the dark.`,
       'dread',
     );
   }

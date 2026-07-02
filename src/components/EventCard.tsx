@@ -2,14 +2,33 @@ import { motion } from 'framer-motion';
 import type { EventCard as EventCardT, EventTone } from '../game/types';
 
 /**
- * An Event, as an illustrated card — icon + ≤4 words + a tone. No prose (PLAN §B.5).
- * The icons are hand-drawn SVG (never Unicode emoji), keyed off `card.icon`.
+ * An Event, as an illustrated card — icon + ≤4 words + a one-line effect + a tone.
+ * No prose paragraphs (PLAN §B.5). Icons are hand-drawn SVG (never Unicode emoji).
  */
 const TONE: Record<EventTone, string> = {
   dread: 'var(--color-dread-bright)',
   hope: 'var(--color-ember-bright)',
   calm: 'var(--color-fog)',
 };
+
+/** A tiny, plain-language effect so a first-timer knows what the card just did. */
+export function effectText(card: EventCardT): string {
+  const a = card.effect.amount ?? 0;
+  switch (card.effect.kind) {
+    case 'torchAll':
+      return a >= 0 ? `every torch +${a}` : `every torch −${-a}`;
+    case 'nightmareStep':
+      return `the Nightmare lurches +${a} step${a === 1 ? '' : 's'}`;
+    case 'darkBite':
+      return `the dark eats +${a} more tile${a === 1 ? '' : 's'}`;
+    case 'lanternFlare':
+      return 'torches near a Lantern flare up';
+    case 'falseDawn':
+      return 'a lost tile flickers back';
+    default:
+      return 'a held breath — nothing stirs';
+  }
+}
 
 export function EventGlyph({ icon, color }: { icon: string; color: string }) {
   const common = { fill: 'none', stroke: color, strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
@@ -78,6 +97,7 @@ export function EventCardView({ card, compact }: { card: EventCardT; compact?: b
       transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
       className={`flex items-center gap-2.5 rounded-lg border bg-gradient-to-b from-twilight/70 to-night/70 ${compact ? 'px-3 py-1.5' : 'px-4 py-2.5'}`}
       style={{ borderColor: `${color}55` }}
+      title={`${card.words} — ${effectText(card)}`}
     >
       <svg width={compact ? 22 : 30} height={compact ? 22 : 30} viewBox="0 0 24 24" style={{ filter: `drop-shadow(0 0 5px ${color}66)` }}>
         <EventGlyph icon={card.icon} color={color} />
@@ -86,6 +106,9 @@ export function EventCardView({ card, compact }: { card: EventCardT; compact?: b
         <div className="font-display text-[8px] uppercase tracking-[0.3em] text-fog-dim">The dark plays</div>
         <div className="truncate font-display text-sm uppercase tracking-wide" style={{ color }}>
           {card.words}
+        </div>
+        <div className={`mt-0.5 truncate font-body italic text-parchment/70 ${compact ? 'text-[10px]' : 'text-[11px]'}`}>
+          {effectText(card)}
         </div>
       </div>
     </motion.div>

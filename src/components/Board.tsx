@@ -30,6 +30,22 @@ function edgePath(ax: number, ay: number, bx: number, by: number, seed: number):
   return `M ${ax} ${ay} Q ${cx} ${cy} ${bx} ${by}`;
 }
 
+/** A jagged, torn hole — deterministic per seed so it doesn't jitter each render. */
+function tornPath(cx: number, cy: number, r: number, seed: number): string {
+  const pts = 10;
+  let s = (seed * 2654435761) >>> 0;
+  const rnd = () => ((s = (s * 1103515245 + 12345) >>> 0), s / 0xffffffff);
+  let d = '';
+  for (let i = 0; i < pts; i++) {
+    const a = (i / pts) * Math.PI * 2;
+    const rr = r * (0.62 + rnd() * 0.55);
+    const x = cx + Math.cos(a) * rr;
+    const y = cy + Math.sin(a) * rr;
+    d += `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)} `;
+  }
+  return d + 'Z';
+}
+
 /** BFS path (list of steps after `from`) over surviving tiles toward `to`. */
 function pathTo(G: GState, from: number, to: number): number[] {
   if (from === to) return [];
@@ -168,6 +184,17 @@ export function GloamingBoard(props: BoardProps<GState>) {
                   <stop offset="0%" stopColor="var(--color-ember-bright)" />
                   <stop offset="100%" stopColor="var(--color-ember)" stopOpacity="0" />
                 </radialGradient>
+                {/* the surviving island of warmth — shrinks as the dark eats in */}
+                <radialGradient id="island" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stopColor="var(--color-ember)" stopOpacity="0.34" />
+                  <stop offset="45%" stopColor="var(--color-ember-deep)" stopOpacity="0.12" />
+                  <stop offset="100%" stopColor="var(--color-ember)" stopOpacity="0" />
+                </radialGradient>
+                {/* corruption that bleeds off every eaten tile */}
+                <radialGradient id="rot" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stopColor="var(--color-dread)" stopOpacity="0.5" />
+                  <stop offset="100%" stopColor="var(--color-dread-deep)" stopOpacity="0" />
+                </radialGradient>
                 <filter id="soft" x="-80%" y="-80%" width="260%" height="260%">
                   <feGaussianBlur stdDeviation="7" result="b" />
                   <feMerge>
@@ -178,6 +205,19 @@ export function GloamingBoard(props: BoardProps<GState>) {
               </defs>
 
               <Atmosphere ratio={darkRatio} reduce={reduce} />
+
+              {/* the shrinking island of light — its radius contracts as the dark wins.
+                  Animate the scale TRANSFORM (never the r attribute). */}
+              <motion.circle
+                cx={BOARD_W / 2}
+                cy={BOARD_H / 2}
+                r={510}
+                fill="url(#island)"
+                pointerEvents="none"
+                style={{ transformOrigin: `${BOARD_W / 2}px ${BOARD_H / 2}px` }}
+                animate={{ scale: (150 + (1 - darkRatio) * 360) / 510 }}
+                transition={{ duration: 1.2, ease: 'easeInOut' }}
+              />
 
               {/* torch-light each bearer casts (a Wisp's gutters low) */}
               {Object.values(G.players).map((p) => {
@@ -387,11 +427,19 @@ function NodeView({
   const gateReady = isGate && G.lanternsDelivered >= LANTERN_COUNT;
 
   if (eaten) {
-    // a tile the dark has swallowed — a jagged hole, not a stone
+    // a tile the dark has DEVOURED — a torn hole bleeding corruption, not a tidy circle
+    const torn = tornPath(node.x, node.y, radius + 4, node.id);
     return (
-      <motion.g style={{ pointerEvents: 'none' }} initial={{ opacity: 0.2 }} animate={{ opacity: 1 }} transition={{ duration: 0.6 }}>
-        <circle cx={node.x} cy={node.y} r={radius + 3} fill="url(#nd-void)" />
-        <circle cx={node.x} cy={node.y} r={radius + 3} fill="none" stroke="var(--color-dread-deep)" strokeWidth={1} strokeOpacity={0.4} />
+      <motion.g
+        style={{ pointerEvents: 'none', transformOrigin: `${node.x}px ${node.y}px` }}
+        initial={{ opacity: 0, scale: 1.3 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.55, ease: 'easeOut' }}
+      >
+        {/* corruption bleeding off the hole (collectively the eaten region glows dread) */}
+        <circle cx={node.x} cy={node.y} r={radius + 16} fill="url(#rot)" style={{ filter: 'url(#soft)' }} />
+        <path d={torn} fill="url(#nd-void)" stroke="var(--color-dread-deep)" strokeWidth={1.5} strokeOpacity={0.7} strokeLinejoin="round" />
+        <path d={tornPath(node.x, node.y, radius - 3, node.id + 7)} fill="#000" fillOpacity={0.7} />
       </motion.g>
     );
   }
@@ -506,26 +554,47 @@ function GateGlyph({ x, y, delivered }: { x: number; y: number; delivered: numbe
 
 function LanternGlyph({ x, y, reduce }: { x: number; y: number; reduce: boolean }) {
   return (
-    <motion.g
-      style={{ pointerEvents: 'none' }}
-      animate={reduce ? undefined : { y: [0, -2.5, 0] }}
-      transition={reduce ? undefined : { duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
-    >
-      <circle cx={x} cy={y} r={16} fill="url(#lantern-glow)" opacity={0.9} />
-      {/* the lantern body */}
-      <rect x={x - 4.5} y={y - 5} width={9} height={11} rx={2} fill="var(--color-ember)" stroke="var(--color-ember-bright)" strokeWidth={1} />
-      <line x1={x - 4.5} y1={y - 5} x2={x + 4.5} y2={y - 5} stroke="var(--color-ember-bright)" strokeWidth={1.4} />
-      <path d={`M ${x - 3} ${y - 5} Q ${x} ${y - 11} ${x + 3} ${y - 5}`} fill="none" stroke="var(--color-ember-bright)" strokeWidth={1.2} />
+    <g style={{ pointerEvents: 'none' }}>
+      {/* a "collectible" halo pulse so it reads as grab-me light */}
       <motion.circle
         cx={x}
-        cy={y + 0.5}
-        r={2}
-        fill="var(--color-ember-glow)"
-        animate={reduce ? undefined : { opacity: [0.7, 1, 0.7], scale: [1, 1.2, 1] }}
-        transition={reduce ? undefined : { duration: 1.4, repeat: Infinity }}
-        style={{ transformOrigin: `${x}px ${y}px`, filter: 'drop-shadow(0 0 4px var(--color-ember))' }}
+        cy={y}
+        r={19}
+        fill="url(#lantern-glow)"
+        animate={reduce ? { opacity: 0.85 } : { opacity: [0.55, 0.95, 0.55], scale: [0.9, 1.08, 0.9] }}
+        transition={reduce ? undefined : { duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+        style={{ transformOrigin: `${x}px ${y}px` }}
       />
-    </motion.g>
+      <motion.g
+        animate={reduce ? undefined : { y: [0, -2, 0] }}
+        transition={reduce ? undefined : { duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+      >
+        {/* top hook + ring */}
+        <path d={`M ${x} ${y - 12} v -2.5`} stroke="var(--color-ember-bright)" strokeWidth={1.4} />
+        <circle cx={x} cy={y - 15} r={2} fill="none" stroke="var(--color-ember-bright)" strokeWidth={1.2} />
+        {/* domed cap */}
+        <path d={`M ${x - 5} ${y - 8} Q ${x} ${y - 14} ${x + 5} ${y - 8} Z`} fill="var(--color-ember-deep)" stroke="var(--color-ember-bright)" strokeWidth={1} />
+        {/* glass cage body (trapezoid) with a bright flame inside */}
+        <path
+          d={`M ${x - 5} ${y - 8} L ${x + 5} ${y - 8} L ${x + 6} ${y + 7} L ${x - 6} ${y + 7} Z`}
+          fill="var(--color-ember)"
+          fillOpacity={0.85}
+          stroke="var(--color-ember-bright)"
+          strokeWidth={1.2}
+          style={{ filter: 'drop-shadow(0 0 6px var(--color-ember))' }}
+        />
+        <line x1={x} y1={y - 8} x2={x} y2={y + 7} stroke="var(--color-ember-bright)" strokeWidth={0.6} strokeOpacity={0.5} />
+        <motion.path
+          d={`M ${x} ${y - 5} C ${x + 3} ${y - 1} ${x + 1.5} ${y + 4} ${x} ${y + 4} C ${x - 1.5} ${y + 4} ${x - 3} ${y - 1} ${x} ${y - 5} Z`}
+          fill="var(--color-ember-glow)"
+          animate={reduce ? undefined : { scaleY: [1, 1.18, 0.94, 1] }}
+          transition={reduce ? undefined : { duration: 1.3, repeat: Infinity, ease: 'easeInOut' }}
+          style={{ transformOrigin: `${x}px ${y + 3}px`, filter: 'drop-shadow(0 0 4px var(--color-ember-bright))' }}
+        />
+        {/* base */}
+        <rect x={x - 6.5} y={y + 7} width={13} height={2.4} rx={1} fill="var(--color-ember-deep)" stroke="var(--color-ember-bright)" strokeWidth={0.6} />
+      </motion.g>
+    </g>
   );
 }
 

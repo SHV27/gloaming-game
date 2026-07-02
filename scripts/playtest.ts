@@ -191,6 +191,6 @@ function run(numPlayers: number, games: number) {
 }
 
 let softlockTotal = 0;
-for (const n of [2, 3, 4]) softlockTotal += run(n, 100).softlocks;
+for (const n of [2, 3, 4]) softlockTotal += run(n, 150).softlocks;
 console.log(`\n${softlockTotal === 0 ? 'OK: no softlocks across all games' : `FAIL: ${softlockTotal} SOFTLOCKS`}`);
 process.exit(softlockTotal === 0 ? 0 : 1);

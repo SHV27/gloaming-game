@@ -224,9 +224,8 @@ export function makeGloaming(config: GloamingConfig): Game<GState> {
           G.nmCharge -= steps;
           for (let i = 0; i < steps; i++) nightmareStep(G);
         } else if (G.nightmare.nextNodeId === null) {
-          // keep the footprint telegraph fresh even on a no-step turn
+          // no telegraph yet (bootstrap / everyone home) — refresh it WITHOUT consuming charge
           nightmareStep(G);
-          G.nmCharge = Math.max(0, G.nmCharge - 1);
         }
 
         refreshAct(G);

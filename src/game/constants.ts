@@ -19,7 +19,7 @@ export const TORCH_BURN_PER_ROUND = 1;
 export const MOVE_DARK_COST = 1;
 /** Torch snuffed when the Nightmare catches you / the dark knocks you inward. */
 export const DARK_KNOCK = 2;
-export const NIGHTMARE_SNUFF = 1;
+export const NIGHTMARE_SNUFF = 2; // a catch bites — and shoves you OUT into the dark
 
 // ── Relight (fellowship — the softlock cure + rescue drama) ──────────────────
 /** Torch a Relit ally comes back with. Relighting is free (presence is the cost). */
@@ -35,13 +35,13 @@ export const MIN_STRIDE = 1; // never fully immobilised by carrying
 //    the reducer accumulates it and resolves whole tiles). Accelerates each Act.
 export function darkBiteFor(act: Act, numPlayers: number): number {
   const base = [2.7, 3.7, 4.7][act];
-  const byTable = numPlayers === 2 ? 0.9 : numPlayers >= 5 ? 1.18 : numPlayers >= 4 ? 1.06 : 0.98;
-  return base * byTable; // 2p gentler; big tables eat faster (they have more hands)
+  const byTable = numPlayers === 2 ? 0.87 : numPlayers === 3 ? 0.95 : numPlayers >= 5 ? 1.2 : 1.08;
+  return base * byTable; // small tables gentler; big tables eat faster (they have more hands)
 }
 /** Delivered Lanterns are a growing light at the Gate that holds the dark back a
  *  little — rewards delivery and makes the climactic final gather winnable. */
 export function darkSlowdownFor(delivered: number): number {
-  return Math.max(0.74, 1 - 0.09 * delivered); // 0→1.0, 3→0.74
+  return Math.max(0.82, 1 - 0.06 * delivered); // 0→1.0, 3→0.82 (gentle — the gather stays a race)
 }
 
 // ── The Nightmare: steps toward the nearest torch each round, by Act ──────────
