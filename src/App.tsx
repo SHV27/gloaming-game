@@ -1,5 +1,7 @@
 import { Suspense, lazy, useMemo, useState } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { SetupScreen, type StartOpts } from './components/SetupScreen';
+import { Splash, splashSeen, markSplashSeen } from './components/Splash';
 import { ShellContext, type ShellApi } from './components/shell';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Loader } from './components/Loader';
@@ -8,6 +10,7 @@ import { Loader } from './components/Loader';
 const GameMount = lazy(() => import('./components/GameMount'));
 
 export default function App() {
+  const [showSplash, setShowSplash] = useState(!splashSeen());
   const [names, setNames] = useState<string[] | null>(null);
   const [opts, setOpts] = useState<StartOpts>({ marked: false });
   const [seat, setSeat] = useState('0');
@@ -28,6 +31,16 @@ export default function App() {
 
   return (
     <ErrorBoundary>
+      <AnimatePresence>
+        {showSplash && (
+          <Splash
+            onDone={() => {
+              markSplashSeen();
+              setShowSplash(false);
+            }}
+          />
+        )}
+      </AnimatePresence>
       {!names ? (
         <SetupScreen
           onStart={(roster, o) => {

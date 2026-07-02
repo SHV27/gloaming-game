@@ -29,73 +29,76 @@ const glacier = 'var(--color-seat-2)';
 
 const STEPS: Step[] = [
   {
-    eyebrow: 'The world',
-    title: 'You walk into the Gloaming',
-    body: 'Dusk is becoming night, and the night here is alive — and it is hunting you. You are Lanternbearers. Light the three Beacons, gather every bearer at the Threshold, and cross together — before the Night drowns the last of the light.',
-    accent: ember,
+    eyebrow: 'You are trapped inside',
+    title: 'The dark eats the board',
+    body: 'You are trapped inside a board game, and the dark is eating it from the edges inward. Every round the outermost tiles turn to void — the tiles fraying with red go next. When the dark reaches the middle, everyone is swallowed. So it herds you all toward the center.',
+    accent: dread,
     motif: (c) => (
       <g>
-        <circle cx="60" cy="60" r="34" fill="none" stroke={c} strokeWidth="2" opacity="0.5" />
-        <circle cx="60" cy="60" r="10" fill={c} style={{ filter: `drop-shadow(0 0 10px ${c})` }} />
-        <path d="M60 6 v-0 M60 110 v4 M6 60 h-0 M110 60 h4" stroke={c} strokeWidth="2" strokeLinecap="round" opacity="0.5" />
+        <circle cx="60" cy="60" r="42" fill="none" stroke="var(--color-void)" strokeWidth="10" opacity="0.9" />
+        <circle cx="60" cy="60" r="30" fill="none" stroke={c} strokeWidth="2" strokeDasharray="3 5" opacity="0.7" />
+        <circle cx="60" cy="60" r="10" fill="var(--color-ember)" style={{ filter: `drop-shadow(0 0 12px var(--color-ember))` }} />
+        <path d="M60 18 A42 42 0 0 1 96 60" fill="none" stroke={c} strokeWidth="4" opacity="0.9" />
       </g>
     ),
   },
   {
-    eyebrow: 'Your lifeline',
-    title: 'Ember is everything',
-    body: "One resource: Ember. It is your life, your fuel, and your fire — you spend it to be Bold, and to feed the Beacons. Each round the deepening night gnaws a little away. If your Ember ever reaches zero you don't die — you become a drifting Wisp, and an ally must reach you to bring you back.",
+    eyebrow: 'Your life is a flame',
+    title: 'Keep your torch lit',
+    body: 'Your torch burns down one notch every round. Refill it to full by reaching a Lantern or the Gate at the center. If it ever goes out you become a drifting Wisp — you cannot act, only drift toward the Gate, until a friend reaches you and relights your torch.',
     accent: ember,
     motif: (c) => (
       <g>
-        <path d={`M60 24 C 78 44 72 66 60 66 C 48 66 42 44 60 24 Z`} fill={c} opacity="0.9" style={{ filter: `drop-shadow(0 0 10px ${c})` }} />
-        <rect x="40" y="82" width="40" height="7" rx="3.5" fill="none" stroke={c} strokeWidth="1.5" opacity="0.6" />
-        <rect x="40" y="82" width="26" height="7" rx="3.5" fill={c} opacity="0.85" />
+        <path d={`M60 22 C 80 44 72 68 60 68 C 48 68 40 44 60 22 Z`} fill={c} opacity="0.95" style={{ filter: `drop-shadow(0 0 12px ${c})` }} />
+        <circle cx="60" cy="56" r="5" fill="var(--color-ember-glow)" />
+        {[0, 1, 2, 3].map((k) => (
+          <rect key={k} x={38 + k * 12} y="84" width="7" height="14" rx="2" fill={k < 3 ? c : 'var(--color-night)'} opacity={k < 3 ? 0.9 : 0.5} />
+        ))}
+      </g>
+    ),
+  },
+  {
+    eyebrow: 'Grab, carry, deliver',
+    title: 'The three Lanterns',
+    body: 'Three Lanterns sit out at the dangerous edge. Walk onto one to grab it — it fills your torch, but its weight makes you move one slower. Carry it to the Gate to deliver it. If you are caught, you drop it where you fall, and someone must fetch it before the dark eats that tile.',
+    accent: ember,
+    motif: (c) => (
+      <g>
+        <rect x="24" y="50" width="20" height="24" rx="4" fill={c} stroke="var(--color-ember-bright)" strokeWidth="1.5" style={{ filter: `drop-shadow(0 0 8px ${c})` }} />
+        <path d="M28 50 Q34 40 40 50" fill="none" stroke="var(--color-ember-bright)" strokeWidth="1.5" />
+        <path d="M52 62 h30" stroke={c} strokeWidth="2" strokeDasharray="4 4" markerEnd="url(#a)" />
+        <path d="M80 56 l10 6 -10 6" fill="none" stroke={c} strokeWidth="2" />
+        <path d="M96 50 v24 M90 55 q6 -8 12 0" fill="none" stroke="var(--color-ember-bright)" strokeWidth="2" />
+      </g>
+    ),
+  },
+  {
+    eyebrow: 'It walks toward you',
+    title: 'The Nightmare hunts',
+    body: 'A Nightmare stalks the board, each round taking a step toward the nearest torch — watch its glowing footprint to see where it will land. If it reaches you, you drop what you carry and reel back. Bait it away so a friend can grab a Lantern. The Gate is the one place it cannot follow.',
+    accent: dread,
+    motif: (c) => (
+      <g>
+        <path d="M60 30 l9 15 18 3 -12 12 4 18 -19 -10 -19 10 4 -18 -12 -12 18 -3 z" fill="var(--color-void)" stroke={c} strokeWidth="2" />
+        <circle cx="60" cy="58" r="5" fill="var(--color-dread-bright)" style={{ filter: `drop-shadow(0 0 6px var(--color-dread-bright))` }} />
+        <circle cx="90" cy="88" r="9" fill="none" stroke={c} strokeWidth="2" strokeDasharray="3 5" opacity="0.8" />
       </g>
     ),
   },
   {
     eyebrow: 'Your turn — the whole rule',
-    title: 'Roll, walk, then Brave or Steady',
-    body: 'Roll your Stride die and step along the glowing paths. Then the place you stand on reacts — and you make ONE choice. BRAVE it: a bold play that spends Ember for a bigger prize and a real risk. Or STEADY: play it safe and gather Ember. Every turn is just that. The game shows you the cost before you commit.',
+    title: 'Roll · Move · one action',
+    body: 'Roll to move, then step to a glowing tile. Then one clear button appears for what you can do here: Grab a Lantern, Deliver it, Relight a friend, or End Turn. Then you watch the board: the dark eats, the Nightmare steps, a card flips. Win when all three Lanterns are home and everyone steps through the Gate — together.',
     accent: glacier,
     motif: (c) => (
       <g>
-        <rect x="18" y="46" width="30" height="30" rx="6" fill="none" stroke={c} strokeWidth="2" />
-        <circle cx="27" cy="55" r="2.4" fill={c} />
-        <circle cx="39" cy="67" r="2.4" fill={c} />
-        <path d="M52 61 h14" stroke={c} strokeWidth="2" strokeDasharray="3 4" />
-        <path d="M74 50 l12 0 0 22 -12 0" fill="none" stroke="var(--color-ember)" strokeWidth="2" />
-        <path d="M92 50 l10 0 0 22 -10 0" fill="none" stroke={c} strokeWidth="2" />
-        <text x="80" y="66" fontSize="9" fill="var(--color-ember)" textAnchor="middle" className="font-display">B</text>
-        <text x="97" y="66" fontSize="9" fill={c} textAnchor="middle" className="font-display">S</text>
-      </g>
-    ),
-  },
-  {
-    eyebrow: 'The board plays back',
-    title: 'The Gloaming shows its hand',
-    body: 'After you act, the board takes its turn — and it tells you what it means to do NEXT: snuff a Beacon, thorn a road shut, wake a Stalker toward your weakest, or surge the Night. You see the blow coming — so outwit it. As the Night deepens through Dusk, the Gloaming, and Pitch, it grows bolder and faster.',
-    accent: dread,
-    motif: (c) => (
-      <g>
-        <path d="M60 26 l7 12 14 2 -10 10 3 14 -14 -8 -14 8 3 -14 -10 -10 14 -2 z" fill="none" stroke={c} strokeWidth="2" />
-        <circle cx="60" cy="60" r="4.5" fill={c} style={{ filter: `drop-shadow(0 0 6px ${c})` }} />
-        <path d="M30 92 q30 -14 60 0" fill="none" stroke="var(--color-dread-bright)" strokeWidth="2" opacity="0.7" />
-      </g>
-    ),
-  },
-  {
-    eyebrow: 'Together, or not at all',
-    title: 'Carry each other into the dawn',
-    body: 'No one crosses alone. Reach a fallen ally and Rekindle their light. To win, every bearer must stand at the Threshold with all three Beacons lit — and the Gloaming will try to snuff one out just as you gather. In larger parties, one of you may be secretly Marked, willing the dark to win: you get one accusation to Cast them Out. Now — light the dark.',
-    accent: glacier,
-    motif: (c) => (
-      <g>
-        <circle cx="44" cy="60" r="10" fill={c} opacity="0.85" />
-        <circle cx="76" cy="60" r="6" fill="none" stroke="var(--color-ember)" strokeWidth="2" strokeDasharray="2 3" />
-        <circle cx="76" cy="60" r="2.5" fill="var(--color-ember)" style={{ filter: `drop-shadow(0 0 5px var(--color-ember))` }} />
-        <path d="M55 60 q10 -10 16 0" fill="none" stroke="var(--color-ember)" strokeWidth="2" />
+        <rect x="20" y="48" width="26" height="26" rx="6" fill="none" stroke={c} strokeWidth="2" />
+        <circle cx="28" cy="56" r="2.2" fill={c} />
+        <circle cx="38" cy="66" r="2.2" fill={c} />
+        <text x="60" y="58" fontSize="11" fill={c} textAnchor="middle" className="font-display">①②③</text>
+        <path d="M78 66 h20" stroke="var(--color-ember)" strokeWidth="2" strokeDasharray="3 4" />
+        <path d="M92 50 l10 0 0 22 -10 0" fill="none" stroke="var(--color-ember)" strokeWidth="2" />
+        <path d="M97 50 q5 -8 10 0" fill="none" stroke="var(--color-ember-bright)" strokeWidth="2" />
       </g>
     ),
   },
@@ -190,7 +193,7 @@ export function Tutorial({ onClose }: { onClose: () => void }) {
               className="rounded-lg border px-7 py-2.5 font-display text-sm uppercase tracking-[0.18em]"
               style={{ borderColor: step.accent, color: last ? 'var(--color-ink)' : step.accent, background: last ? step.accent : `${step.accent}1a` }}
             >
-              {last ? 'Into the Dusk' : 'Next'}
+              {last ? "I'm ready" : 'Next'}
             </motion.button>
           </div>
         </div>
