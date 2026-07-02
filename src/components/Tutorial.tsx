@@ -102,6 +102,24 @@ const STEPS: Step[] = [
       </g>
     ),
   },
+  {
+    eyebrow: 'You each break one rule',
+    title: 'Choose your Hero',
+    body: 'Before you play, each of you picks a Hero — and every Hero breaks one rule of the game. The Swift reaches further; the Lamplighter carries Lanterns at full speed; the Unseen walks the dark unburned. Read your one line and play to it — no one escapes alone.',
+    accent: ember,
+    motif: (c) => (
+      <g fill="none" stroke={c} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+        {[38, 60, 82].map((x, i) => (
+          <g key={x} opacity={0.6 + i * 0.2}>
+            <circle cx={x} cy="42" r="7" fill={c} stroke="none" />
+            <path d={`M${x} 49 v22`} />
+            <path d={`M${x} 55 l-9 8 M${x} 55 l9 8 M${x} 71 l-8 12 M${x} 71 l8 12`} />
+          </g>
+        ))}
+        <path d="M18 92 h84" strokeOpacity="0.4" />
+      </g>
+    ),
+  },
 ];
 
 export function Tutorial({ onClose }: { onClose: () => void }) {

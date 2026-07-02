@@ -10,6 +10,7 @@
     "playtest": "vite-node scripts/playtest.ts",
     "grandmaster": "vite-node scripts/grandmaster.ts",
     "referee": "vite-node scripts/referee.ts",
+    "uistate": "vite-node scripts/uistate.ts",
     "lint": "oxlint",
     "preview": "vite preview"
   },

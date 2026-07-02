@@ -52,14 +52,27 @@ plannable future (+ the Grandmaster skill-gap proof). **No LLM at runtime. No en
   Referee **H15** (every ending → valid verdict) + **H17** (gate-open fires once) ✓; band/spread/softlocks ✓;
   build ✓.
 
+- **WS7** UI-state machine + onboarding finished. `phase.ts` `turnControls(G,current,playerID)` → single source
+  of {phase, canRoll/Move/Act/EndTurn}; TurnHud derives from it. `scripts/uistate.ts` (`npm run uistate`, H16):
+  1272 turns — per-phase control contract holds AND the engine REJECTS out-of-order input (no move/act/end
+  before roll, no re-roll) → button-order bugs structurally impossible. **`Coach.tsx`** scripted first turn
+  (first game only): "Roll → tap a glowing tile → grab → watch the board" coachmarks, skippable. How-to **+6th
+  Heroes panel**. a11y: tiles keyboard-navigable (tab/enter, focus=hover), reduced-motion honored. All screens
+  screenshot-verified studio-grade. Referee + build + uistate + console-check (0 errors) ✓.
+
 ## ▶ NEXT ACTION
-**WS7 — UI-state machine + tests, final art/juice, finished onboarding.** (1) `turnPhase(G,ctx,myTurn) →
-'watch'|'roll'|'move'|'act'|'resolving'` pure fn; assert per-phase enabled controls in `scripts/uistate.ts`
-(`npm run uistate`, referee H16) — button-order bugs structurally impossible. (2) Scripted **teach-by-playing
-first turn** (`Coach.tsx`): coachmarks over the real first turn (roll → glowing tile → grab → watch dark+Hollow
-One → checklist pulses), skippable/re-openable. (3) How-to **+ a Heroes panel**. (4) Final art/juice pass
-(Gate-open, act transitions, Hollow One evolution get the big juice), a11y (reduced-motion/keyboard/contrast),
-perf, **0 console errors local**. Commit.
+**WS8 — Certification → ship.** (1) Run the Council as subagents (Game Designer · Art Director · Principal
+Engineer · Referee-review · Playtester-read · Fresh-Eyes) + the **🏆 Certification pass** (hostile-QA: 2p & 4p,
+every hero, every ending, tutorial/how-to/select/MatchStory, resize/refresh/sound/reduced-motion; zero open
+defects). Fix findings. (2) **README** = the six-session case study (built→torn down→reconceived→crowned; the
+agent system; the numbers). (3) Deploy prod (`vercel --prod --yes --scope shv-s-projects`; stored login — if
+auth missing, STOP and tell the user). Verify prod with `console-check.mjs` through real gameplay. (4) Print:
+live URL · repo URL · LinkedIn post (my voice) · 100-word hackathon pitch. Final `CLAUDE.md`/`PROGRESS.md`.
+
+## S6 verification gates (all green)
+`npm run typecheck` · `npm run build` · `npm run referee` (H1–H17) · `npm run playtest` (band 45–55, spread ≤±8,
+0 softlocks) · `npm run grandmaster` (+15@2p, positive everywhere) · `npm run uistate` (control contract) ·
+`node scripts/console-check.mjs <url>` (0 errors).
 
 ## ⚠ Balance gotchas (S6 — carry forward)
 - Torch is now **7** (was 8). Frayed step costs **2** (was 1) — reading the fraying telegraph is a real skill;

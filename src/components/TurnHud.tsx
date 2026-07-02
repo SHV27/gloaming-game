@@ -6,6 +6,7 @@ import { Dice } from './Dice';
 import { Button } from '../ui/Button';
 import { EventCardView, OmenCard } from './EventCard';
 import { getTileAction } from '../game/effects';
+import { turnControls } from '../game/phase';
 import { eventById } from '../game/events';
 import { heroById } from '../game/heroes';
 import { SEAT_COLORS, TORCH_MAX, LANTERN_COUNT } from '../game/constants';
@@ -40,8 +41,10 @@ export function TurnHud({
 
   if (!me) return null;
 
-  const preRoll = myTurn && !me.wisp && !G.autoWisp && !G.hasRolled;
-  const canAct = myTurn && !me.wisp && !G.autoWisp && G.hasRolled && !G.acted;
+  // controls come from the single turn-state machine (same source the tests assert)
+  const ctrl = turnControls(G, ctx.currentPlayer, props.playerID);
+  const preRoll = ctrl.phase === 'roll';
+  const canAct = ctrl.canAct;
   const action = getTileAction(G, me);
   const lanternsLeft = LANTERN_COUNT - G.lanternsDelivered;
   const goal =

@@ -14,6 +14,7 @@ import { RoleReveal } from './RoleReveal';
 import { Atmosphere } from './Atmosphere';
 import { TopBar } from './TopBar';
 import { BeatBanner } from './Beats';
+import { Coach, coachActive, markCoachDone } from './Coach';
 import { useGameSound } from '../hooks/useGameSound';
 import { sound } from '../audio/sound';
 import { useShell } from './shell';
@@ -154,6 +155,9 @@ export function GloamingBoard(props: BoardProps<GState>) {
     return (Math.atan2(to.y - from.y, to.x - from.x) * 180) / Math.PI;
   }, [G.nightmare, G.nodes]);
 
+  // the scripted first-turn coach (very first game only)
+  const [coaching, setCoaching] = useState(() => coachActive());
+
   // what-if on hover: the silent ghost of a move (depth for those who look)
   const [hover, setHover] = useState<number | null>(null);
   const whatIf = useMemo(() => {
@@ -202,6 +206,19 @@ export function GloamingBoard(props: BoardProps<GState>) {
           <BeatBanner beats={G.beats} />
           {/* the Gate throwing open — the win-explainer moment */}
           <GateOpenFlood flash={G.flash} />
+          {/* the scripted first-turn coach (first game only) */}
+          {coaching && !ctx.gameover && (
+            <Coach
+              G={G}
+              currentPlayer={ctx.currentPlayer}
+              playerID={playerID}
+              turn={ctx.turn}
+              onDone={() => {
+                markCoachDone();
+                setCoaching(false);
+              }}
+            />
+          )}
           <motion.div animate={shake} className="relative h-full w-full">
             <svg
               viewBox={`0 0 ${BOARD_W} ${BOARD_H}`}
@@ -623,10 +640,23 @@ function NodeView({
 
   return (
     <g
-      className={reachable ? 'cursor-pointer' : ''}
+      className={reachable ? 'cursor-pointer focus:outline-none' : ''}
       onClick={onPick}
       onMouseEnter={reachable ? () => onHover(node.id) : undefined}
       onMouseLeave={reachable ? () => onHover(null) : undefined}
+      onFocus={reachable ? () => onHover(node.id) : undefined}
+      onBlur={reachable ? () => onHover(null) : undefined}
+      onKeyDown={
+        reachable
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onPick();
+              }
+            }
+          : undefined
+      }
+      tabIndex={reachable ? 0 : undefined}
       style={{ pointerEvents: reachable ? 'auto' : 'none' }}
       role={reachable ? 'button' : undefined}
       aria-label={reachable ? `Move to ${node.label ?? 'this tile'}` : undefined}
