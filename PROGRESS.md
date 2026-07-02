@@ -21,22 +21,35 @@ plannable future (+ the Grandmaster skill-gap proof). **No LLM at runtime. No en
   Unseen, Stubborn half-burn). `HeroSelect.tsx` (silhouette art, hotseat pick order); threaded App→GameMount→
   client→setup; HUD hero line + roster labels. **Unseen rebalanced**: "overlooked *until you carry a Lantern*".
   (3p dark table-mult 0.95→1.0.)
-- **WS3** The Hollow One (crowned). `nightmare.path[]` full-route telegraph (`path[0]==nextNodeId`, ≤4 steps,
-  never crosses void/Gate); **Pitch bearer-hunting** (`nightmareGoals` prefers non-hidden bearers → torch →
-  idle, never strands). Board: fading footfall-trail path (glides on retarget = "changes its mind"); the token
-  **evolves by Act** (Dusk small/1 eye/slow → Gloaming wakes/2 eyes/quicker → Pitch big/fierce/gaze-beam);
-  **gaze** springs to face its quarry + lock-on flourish on new target. **Named THE HOLLOW ONE** (how-to, setup,
-  act-change beats, all logs/effect text). Balance **2p51/3p49/4p46 (in band), spread 6.8 (≤±8), nail 68–81%,
-  0 softlocks**; referee H12/H13/H14 + path-coherence ✓; build ✓; console-check ✓ 0 errors.
+- **WS3** The Hollow One (crowned). `nightmare.path[]` full-route telegraph; **Pitch bearer-hunting**; Board:
+  fading footfall-trail (glides on retarget); token **evolves by Act** (Dusk→Gloaming→Pitch); **gaze** + lock-on;
+  named **THE HOLLOW ONE**. Referee H13 + path-coherence ✓.
+- **WS4** Plannable future + **THE GRANDMASTER PROOF**. `scripts/grandmaster.ts` (`npm run grandmaster`): a smart
+  bot (danger-weighted racing, no-gutter, coordinate, carry-dodge, Unseen fray-immunity) vs a careless greedy on
+  **paired seeded games** (kills setup-luck noise). **Result: +20.5 pts @2p (skill matters most / most-played),
+  +8 @3p, +6 @4p — positive at every count, +11.3 overall.** ("Tune until skill pays": torch 8→7, frayed step
+  cost 1→2 [reading the telegraph is now a real skill], dark rates fully retuned per count.) **Unseen repivoted**
+  from "overlooked until carrying" (a trap pick, −13 spread) → **"slips the dark — frayed tiles never burn your
+  torch"** (spread now 3.2). **Omen** (next card's suit ☠/✦/⚡, face-down in HUD) + **what-if hover** (ghost:
+  N→Lantern · in/out of the Hollow One's path · dark-eats-next). Band **52/47/46, spread 3.2, nail 61–85%, 0
+  softlocks**. Referee ✓ (H12 rewritten for fray-immunity), build ✓, console-check ✓ 0 errors.
 
 ## ▶ NEXT ACTION
-**WS4 — Plannable future + the Grandmaster proof.** (1) **Omen**: expose the next event's suit (☠ dread / ✦ hope
-/ ⚡ calm) as a face-down card in the HUD (derive from `G.deck` top). (2) **What-if hover**: on a reachable tile,
-a silent ghost — "land here · N to a Lantern · in/out of the Hollow One's path". (3) **Grandmaster bot**
-(`scripts/grandmaster.ts` or a flag in playtest): plans 1–2 rounds ahead (escort/protect bearers, pre-position
-rescues, bait the Hollow One off carriers, avoid frayed tiles, refuel before guttering, read forecast+path).
-Print greedy vs smart win-rate per count; **require smart ≥ greedy +15 pts**; tune until skill pays. Referee +
-playtest + commit.
+**WS5 — Causal legibility.** (1) **Beats**: add `beats: Beat[]` ring-buffer + `beat()` helper; push at cause
+points (grab/deliver/drop/catch/rescue/wisp/dark-eat/event/act/gate-open/escape). Render (a) a transient
+cause→effect **banner**, (b) a last-4 **turn-log strip**. (2) **Escape Checklist** (`EscapeChecklist.tsx`, always
+visible, drawn glyphs): 🏮 N/3 · 👥 atGate/total · 🔥 lit/total — each lights when satisfied. (3) **Gate-opening
+moment**: `gate-open` flash in `deliverAtGate` at the 3rd delivery → light floods + swell + big beat. (4) **Honest
+forecast**: `retelegraphDark` marks EXACTLY the whole-tile bite next round; Dark gauge reads "−N next round".
+Referee + playtest + commit.
+
+## ⚠ Balance gotchas (S6 — carry forward)
+- Torch is now **7** (was 8). Frayed step costs **2** (was 1) — reading the fraying telegraph is a real skill;
+  the Unseen is immune to it. `darkBiteFor` base **[2.2,3.0,3.9]**, `byTable` per count tuned to the gap+band
+  sweet spot (2p 0.52 / 3p 1.05 / 4p 1.22). Re-run BOTH `npm run playtest` (band 45–55 + spread ≤±8) AND
+  `npm run grandmaster` (2p gap ≥15, positive everywhere) after ANY constant change.
+- The Grandmaster gap is **large at small tables, small at 4p by design** (more hands forgive more — a real
+  co-op truth). Don't "fix" 4p by over-tightening — it makes the smart bot too slow and flips the gap negative.
 
 ## S6 workstreams (see PLAN §J)
 1. ✅ WS1 baseline + PLAN v4 + CLAUDE.md.  2. WS2 Heroes.  3. WS3 The Hollow One.  4. WS4 Plannable future +

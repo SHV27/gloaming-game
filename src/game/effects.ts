@@ -291,15 +291,10 @@ export function reachable(G: GState, from: number, stride: number): Set<number> 
 // ── The Nightmare (embodied hunter) ─────────────────────────────────────────
 const nonWisp = (G: GState) => Object.values(G.players).filter((p) => !p.wisp);
 /** Who the Hollow One will hunt. The Gate's light is sanctuary (a bearer on the
- *  Gate is never a target, PLAN §B.4), and THE UNSEEN is overlooked *while empty-
- *  handed* — pick up a Lantern and its light gives you away (it can still be
- *  stumbled into en route — resolved on arrival, not here). In Pitch it prefers a
- *  Lantern-bearer (WS3 crowning); the fallback chain can never strand it (H13). */
-function isHidden(p: Player): boolean {
-  return p.hero === 'unseen' && p.carrying.length === 0;
-}
+ *  Gate is never a target, PLAN §B.4). In Pitch it prefers a Lantern-bearer (WS3
+ *  crowning); the fallback chain (bearers → any torch → idle) can never strand it. */
 function nightmareGoals(G: GState): Set<number> {
-  const exposed = nonWisp(G).filter((p) => p.nodeId !== G.gateId && !isHidden(p));
+  const exposed = nonWisp(G).filter((p) => p.nodeId !== G.gateId);
   // PITCH (Act 2): the Hollow One wakes fully and hunts the Lanterns themselves —
   // it locks onto the nearest exposed *bearer*. Fallback chain (bearers → any
   // exposed torch → idle) can never strand it with no legal target (H13).
@@ -459,8 +454,10 @@ export function strideFor(roll: number, carrying: number, hero?: HeroId): number
   const swift = hero === 'swift' ? 1 : 0;
   return Math.max(MIN_STRIDE, roll - pen) + swift;
 }
-/** Torch cost to step INTO a tile (frayed edge tiles bite). */
-export function stepTorchCost(G: GState, toNodeId: number): number {
+/** Torch cost to step INTO a tile (frayed edge tiles bite). THE UNSEEN slips
+ *  through the dark unburned — the cold edge never costs it torch. */
+export function stepTorchCost(G: GState, toNodeId: number, p?: Player): number {
+  if (p?.hero === 'unseen') return 0;
   return G.fraying.includes(toNodeId) ? MOVE_DARK_COST : 0;
 }
 

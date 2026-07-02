@@ -87,6 +87,73 @@ export function EventGlyph({ icon, color }: { icon: string; color: string }) {
   }
 }
 
+// ── The Omen — the next card sits face-down, but its SUIT is visible: one glance
+//    of dread or hope, still uncertain in detail (telegraphed-but-uncertain). ────
+const SUIT: Record<EventTone, { label: string; color: string }> = {
+  dread: { label: 'cruel', color: 'var(--color-dread-bright)' },
+  hope: { label: 'kind', color: 'var(--color-ember-bright)' },
+  calm: { label: 'wild', color: 'var(--color-fog)' },
+};
+
+function SuitGlyph({ tone, color }: { tone: EventTone | null; color: string }) {
+  const common = { fill: 'none', stroke: color, strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+  if (tone === 'dread')
+    // a bared skull — cruelty coming
+    return (
+      <g {...common}>
+        <path d="M6 10 a6 6 0 0 1 12 0 v3 a3 3 0 0 1 -2 2 v2 h-8 v-2 a3 3 0 0 1 -2 -2 z" />
+        <circle cx="9.5" cy="10.5" r="1.6" fill={color} stroke="none" />
+        <circle cx="14.5" cy="10.5" r="1.6" fill={color} stroke="none" />
+        <path d="M12 13 v2 M10 19 v2 M12 19 v2 M14 19 v2" />
+      </g>
+    );
+  if (tone === 'hope')
+    // a four-point spark — a kindness
+    return (
+      <g {...common}>
+        <path d="M12 3 L13.5 10.5 L21 12 L13.5 13.5 L12 21 L10.5 13.5 L3 12 L10.5 10.5 Z" fill={color} fillOpacity={0.25} />
+      </g>
+    );
+  if (tone === 'calm')
+    // a bolt — wild, unpredictable
+    return (
+      <g {...common}>
+        <path d="M13 3 L7 13 h4 l-2 8 8 -11 h-4 z" fill={color} fillOpacity={0.25} />
+      </g>
+    );
+  // unknown (the deck is about to reshuffle)
+  return (
+    <g {...common}>
+      <path d="M9 9 a3 3 0 1 1 4 2.5 c -1 0.7 -1 1.5 -1 2.5" />
+      <circle cx="12" cy="18" r="0.6" fill={color} stroke="none" />
+    </g>
+  );
+}
+
+/** The face-down next card, showing only its suit. */
+export function OmenCard({ tone }: { tone: EventTone | null }) {
+  const s = tone ? SUIT[tone] : { label: 'unknown', color: 'var(--color-fog-dim)' };
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="flex items-center gap-2 rounded-lg border border-dashed bg-gradient-to-b from-twilight/50 to-night/50 px-2.5 py-1.5"
+      style={{ borderColor: `${s.color}66` }}
+      title={`The dark's next card is ${s.label}`}
+    >
+      <svg width={20} height={20} viewBox="0 0 24 24" style={{ filter: `drop-shadow(0 0 4px ${s.color}55)` }}>
+        <SuitGlyph tone={tone} color={s.color} />
+      </svg>
+      <div className="min-w-0">
+        <div className="font-display text-[8px] uppercase tracking-[0.28em] text-fog-dim">Next omen</div>
+        <div className="font-display text-[11px] uppercase tracking-wide" style={{ color: s.color }}>
+          {s.label}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 export function EventCardView({ card, compact }: { card: EventCardT; compact?: boolean }) {
   const color = TONE[card.tone];
   return (

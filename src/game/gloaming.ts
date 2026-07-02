@@ -282,7 +282,7 @@ export function makeGloaming(config: GloamingConfig): Game<GState> {
         G.stride -= 1;
         p.nodeId = nodeId;
         G.movedThisTurn = true;
-        burnTorch(G, p, stepTorchCost(G, nodeId)); // stepping the cold edge costs warmth
+        burnTorch(G, p, stepTorchCost(G, nodeId, p)); // stepping the cold edge costs warmth (not the Unseen)
         flash(G, 'step', nodeId);
         if (p.wisp) {
           // guttered out mid-move → becomes a Wisp; turn will pass

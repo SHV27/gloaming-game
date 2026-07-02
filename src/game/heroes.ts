@@ -55,9 +55,9 @@ export const HEROES: Hero[] = [
   {
     id: 'unseen',
     name: 'THE UNSEEN',
-    epithet: 'the overlooked',
-    ability: 'The Hollow One overlooks you — until you carry a Lantern.',
-    play: 'Empty-handed, walk the dark freely — scout, bait, and rescue.',
+    epithet: 'the dark walker',
+    ability: 'You slip through the dark — frayed tiles never burn your torch.',
+    play: 'Scout and fetch from the deadly edge without ever getting burned.',
     motif: 'unseen',
     accent: 'var(--color-seat-3)', // orchid — the shadow
   },

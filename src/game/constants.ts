@@ -10,13 +10,15 @@ import type { Act } from './types';
 
 export const STRIDE_DIE = 6; // the movement die
 
-// ── The Torch: your life, a flame with notches ──────────────────────────────
-export const TORCH_START = 8;
-export const TORCH_MAX = 8;
+// ── The Torch: your life, a flame with notches. Kept tight so torch management
+//    (refuel before you gutter, don't walk the cold edge) is a decisive skill. ──
+export const TORCH_START = 7;
+export const TORCH_MAX = 7;
 /** The night burns one notch off the active bearer's torch each round. */
 export const TORCH_BURN_PER_ROUND = 1;
-/** Extra torch spent to step INTO a frayed tile (the dark's cold edge). */
-export const MOVE_DARK_COST = 1;
+/** Extra torch spent to step INTO a frayed tile (the dark's cold edge). Reading the
+ *  fraying telegraph and routing around it is a real skill — so the bite is real. */
+export const MOVE_DARK_COST = 2;
 /** Torch snuffed when the Nightmare catches you / the dark knocks you inward. */
 export const DARK_KNOCK = 2;
 export const NIGHTMARE_SNUFF = 2; // a catch bites — and shoves you OUT into the dark
@@ -34,8 +36,8 @@ export const MIN_STRIDE = 1; // never fully immobilised by carrying
 // ── The Dark: how many frontier tiles it eats each round, by Act (may be fractional;
 //    the reducer accumulates it and resolves whole tiles). Accelerates each Act.
 export function darkBiteFor(act: Act, numPlayers: number): number {
-  const base = [2.7, 3.7, 4.7][act];
-  const byTable = numPlayers === 2 ? 0.87 : numPlayers === 3 ? 1.0 : numPlayers >= 5 ? 1.2 : 1.08;
+  const base = [2.2, 3.0, 3.9][act];
+  const byTable = numPlayers === 2 ? 0.52 : numPlayers === 3 ? 1.05 : numPlayers >= 5 ? 1.35 : 1.22;
   return base * byTable; // small tables gentler; big tables eat faster (they have more hands)
 }
 /** Delivered Lanterns are a growing light at the Gate that holds the dark back a

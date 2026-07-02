@@ -4,7 +4,7 @@ import type { BoardProps } from 'boardgame.io/react';
 import type { GState, TileAction } from '../game/types';
 import { Dice } from './Dice';
 import { Button } from '../ui/Button';
-import { EventCardView } from './EventCard';
+import { EventCardView, OmenCard } from './EventCard';
 import { getTileAction } from '../game/effects';
 import { eventById } from '../game/events';
 import { heroById } from '../game/heroes';
@@ -98,12 +98,13 @@ export function TurnHud({
           <div className="truncate font-body text-[13px] text-parchment/90">{goal}</div>
         </div>
 
-        {/* the last event card */}
+        {/* the last event card + the telegraphed next omen (suit only) */}
         {G.lastEvent != null && (
           <AnimatePresence mode="wait">
             <EventCardView key={G.lastEvent} card={eventById(G.lastEvent)} compact />
           </AnimatePresence>
         )}
+        <OmenCard tone={G.deck.length > 0 ? eventById(G.deck[G.deck.length - 1]).tone : null} />
 
         {/* dice + roll (step ①) */}
         <div className="flex items-center gap-3">

@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "playtest": "vite-node scripts/playtest.ts",
+    "grandmaster": "vite-node scripts/grandmaster.ts",
     "referee": "vite-node scripts/referee.ts",
     "lint": "oxlint",
     "preview": "vite preview"

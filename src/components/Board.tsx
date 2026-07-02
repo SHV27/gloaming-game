@@ -153,6 +153,36 @@ export function GloamingBoard(props: BoardProps<GState>) {
     return (Math.atan2(to.y - from.y, to.x - from.x) * 180) / Math.PI;
   }, [G.nightmare, G.nodes]);
 
+  // what-if on hover: the silent ghost of a move (depth for those who look)
+  const [hover, setHover] = useState<number | null>(null);
+  const whatIf = useMemo(() => {
+    if (hover == null || !reachable.has(hover)) return null;
+    const n = G.nodes[hover];
+    const lanternNodes = G.lanterns.filter((l) => !l.delivered && l.carriedBy === null && l.nodeId != null).map((l) => l.nodeId!);
+    let lDist: number | null = null;
+    if (lanternNodes.length) {
+      const goal = new Set(lanternNodes);
+      const seen = new Set([hover]);
+      let frontier = [hover];
+      let d = 0;
+      while (frontier.length && d <= 30) {
+        if (frontier.some((x) => goal.has(x))) { lDist = d; break; }
+        const next: number[] = [];
+        for (const c of frontier) for (const m of G.nodes[c].neighbors) if (!seen.has(m) && !isVoid(G, m)) { seen.add(m); next.push(m); }
+        frontier = next;
+        d++;
+      }
+    }
+    return {
+      x: n.x,
+      y: n.y,
+      onGate: hover === G.gateId,
+      lDist,
+      inPath: G.nightmare.path.includes(hover) || G.nightmare.nextNodeId === hover,
+      frayed: G.fraying.includes(hover),
+    };
+  }, [hover, reachable, G]);
+
   const handoffNeeded = !ctx.gameover && playerID !== ctx.currentPlayer;
 
   return (
@@ -273,6 +303,7 @@ export function GloamingBoard(props: BoardProps<GState>) {
                   reachable={reachable.has(n.id)}
                   reduce={reduce}
                   onPick={() => walkTo(n.id)}
+                  onHover={setHover}
                 />
               ))}
 
@@ -313,6 +344,26 @@ export function GloamingBoard(props: BoardProps<GState>) {
                 gazeAngle={nmGaze}
                 reduce={reduce}
               />
+
+              {/* what-if: the silent ghost of the hovered move */}
+              {whatIf && (
+                <g pointerEvents="none" transform={`translate(${whatIf.x}, ${whatIf.y - 42})`}>
+                  <rect x={-58} y={-19} width={116} height={34} rx={6} fill="var(--color-night)" fillOpacity={0.94} stroke="var(--color-haze)" strokeWidth={1} />
+                  <text x={0} y={-5} textAnchor="middle" fontSize={10} className="font-display" fill="var(--color-ember-bright)">
+                    {whatIf.onGate ? 'The Gate' : whatIf.lDist != null ? `${whatIf.lDist} to a Lantern` : 'you land here'}
+                  </text>
+                  <text
+                    x={0}
+                    y={9}
+                    textAnchor="middle"
+                    fontSize={9}
+                    className="font-body"
+                    fill={whatIf.frayed || whatIf.inPath ? 'var(--color-dread-bright)' : 'var(--color-fog)'}
+                  >
+                    {whatIf.frayed ? 'the dark eats this next' : whatIf.inPath ? "in the Hollow One's path" : 'safe for now'}
+                  </text>
+                </g>
+              )}
             </svg>
           </motion.div>
 
@@ -495,12 +546,14 @@ function NodeView({
   reachable,
   reduce,
   onPick,
+  onHover,
 }: {
   node: BoardNode;
   G: GState;
   reachable: boolean;
   reduce: boolean;
   onPick: () => void;
+  onHover: (id: number | null) => void;
 }) {
   const isGate = node.type === 'gate';
   const eaten = isVoid(G, node.id);
@@ -532,6 +585,8 @@ function NodeView({
     <g
       className={reachable ? 'cursor-pointer' : ''}
       onClick={onPick}
+      onMouseEnter={reachable ? () => onHover(node.id) : undefined}
+      onMouseLeave={reachable ? () => onHover(null) : undefined}
       style={{ pointerEvents: reachable ? 'auto' : 'none' }}
       role={reachable ? 'button' : undefined}
       aria-label={reachable ? `Move to ${node.label ?? 'this tile'}` : undefined}

@@ -22,6 +22,7 @@ import {
   dropCarried,
   getTileAction,
   relight,
+  stepTorchCost,
 } from '../src/game/effects';
 import { RING_OF, OUTER_RING, GATE_ID } from '../src/game/board';
 import { LANTERN_COUNT } from '../src/game/constants';
@@ -282,20 +283,17 @@ section('Softlock fuzz: every game reaches a terminal state (H2, H3)');
   console.log(`  · ${terminated}/${GAMES} chaos games reached a terminal state`);
 }
 
-// ── §H.12 — THE UNSEEN: all exposed players Unseen → the Hollow One idles (no crash) ─
-section('All-Unseen table → the Hollow One has no target, never crashes (H12)');
+// ── §H.12 — THE UNSEEN slips the dark edge (frayed costs it no torch); all-Unseen terminates ─
+section('The Unseen crosses frayed tiles unburned; all-Unseen table terminates (H12)');
 {
   const G = freshG(2);
-  for (const p of Object.values(G.players)) {
-    p.hero = 'unseen';
-    p.nodeId = G.nodes.find((n) => RING_OF[n.id] === 2)!.id; // out in the field, exposed
-    p.wisp = false;
-  }
-  G.nightmare.nodeId = G.nodes.find((n) => RING_OF[n.id] === 1)!.id;
-  for (let i = 0; i < 8; i++) nightmareStep(G); // must not throw, must not snuff an Unseen it isn't hunting
-  assert(G.nightmare.nextNodeId === null, 'no telegraph when every exposed torch is Unseen');
-  assert(Object.values(G.players).every((p) => !p.wisp), 'the Unseen are never hunted down');
-  // a full all-Unseen game still terminates (the dark ends it)
+  const unseen = G.players['0'];
+  const normal = G.players['1'];
+  unseen.hero = 'unseen';
+  const frayed = G.fraying.find((id) => id !== undefined)!;
+  assert(stepTorchCost(G, frayed, unseen) === 0, 'a frayed step costs the Unseen no torch');
+  assert(stepTorchCost(G, frayed, normal) > 0, 'a frayed step DOES bite a normal bearer');
+  // a full all-Unseen game still terminates (they are hunted normally now — no immunity)
   const c = Client({ game: makeGloaming({ names: NAMES.slice(0, 2), heroes: ['unseen', 'unseen'] }), numPlayers: 2 });
   c.start();
   let guard = 0;
