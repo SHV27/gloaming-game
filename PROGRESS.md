@@ -5,7 +5,11 @@
 
 ---
 
-## Where we are — S5 THE RECONCEPTION: COMPLETE (pending only the prod deploy)
+## Where we are — S5 THE RECONCEPTION: ✅ SHIPPED TO PRODUCTION
+**Live: https://gloaming-murex.vercel.app** (deployed 2026-07-02; prod console-check = 0 errors).
+Repo: https://github.com/SHV27/gloaming-game (master).
+
+
 GLOAMING is rebuilt from a euro-puzzle into a **visible, physical, self-teaching adventure**
 (*Trapped Inside*): the dark eats the board from the edges inward, a Nightmare walks toward the
 nearest torch, you carry 3 Lanterns to the central Gate and get everyone out before the center
@@ -39,14 +43,14 @@ pushing the prod deploy (the deploy token isn't in the automated shell — see N
 - Visual: splash, how-to, opening board (warm island, DUSK), and deep game (devoured board, PITCH)
   all render studio-grade — screenshots in `.shots/` (gitignored).
 
-## ▶ NEXT ACTION — push the prod deploy
-The build + repo are ready. To publish:
-1. **GitHub:** `git push origin master` (gh is authed as SHV27 → `github.com/SHV27/gloaming-game`).
-2. **Vercel:** the deploy token is NOT in the automated shell. With `VERCEL_TOKEN` exported in an
-   interactive shell (or a stored `vercel login`):
-   `vercel --prod --yes --scope shv-s-projects` (project `gloaming`, `.vercel/project.json` already links it).
-   Prod alias: `https://gloaming-murex.vercel.app`. No runtime secret/env needed anymore (narrator gone).
-3. Run `scripts/console-check.mjs <prod-url>` against the live URL to confirm 0 console errors in prod.
+## ▶ NEXT ACTION — none blocking; the reconception is shipped
+Done: pushed to GitHub (master) and deployed to Vercel prod (`gloaming-murex.vercel.app`, verified
+0 console errors live via `scripts/console-check.mjs <url>`). Deploy used a stored `vercel login`
+(no `VERCEL_TOKEN` needed); redeploy with `vercel --prod --yes --scope shv-s-projects`.
+
+Optional future polish (not blocking, from the Council's minor findings): telegraph the *next* event
+card face-up; an optional per-turn "dash" (spend a torch notch for +1 stride) for more in-turn agency;
+differentiate the Nightmare silhouette from its footprint; a fully-scripted teach-by-playing first turn.
 
 ## v3 engine gotchas (carry forward)
 - World reacts in `turn.onEnd` (guard `boardActed`): dark/Nightmare pace via accumulators
