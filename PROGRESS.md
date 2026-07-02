@@ -1,83 +1,64 @@
 # PROGRESS.md — GLOAMING v3 (*Trapped Inside*)
 
-> Resumable checkpoint. A fresh session reads this + `PLAN.md` and continues with
-> "read PROGRESS.md and continue the reconception." Update after **every** workstream.
-> One next action, always. Nothing is ever lost.
+> Resumable checkpoint. A fresh session reads this + `PLAN.md` and continues.
+> Update after every workstream. One next action, always.
 
 ---
 
-## Where we are — S5 THE RECONCEPTION (in progress)
-We are rebuilding GLOAMING from a **euro-puzzle** (v2: abstract Ember, Brave/Steady, a Night
-*meter*, beacons lit by pouring numbers) into a **visible, physical, self-teaching adventure**
+## Where we are — S5 THE RECONCEPTION: COMPLETE (pending only the prod deploy)
+GLOAMING is rebuilt from a euro-puzzle into a **visible, physical, self-teaching adventure**
 (*Trapped Inside*): the dark eats the board from the edges inward, a Nightmare walks toward the
-nearest torch, you carry 3 Lanterns to the Gate and get everyone out before the center falls.
-**Design law:** the mechanic and the fantasy must be the same thing — every rule is a THING YOU
-SEE. Full spec in `PLAN.md`. **No LLM/Gemini at runtime — deleted.**
+nearest torch, you carry 3 Lanterns to the central Gate and get everyone out before the center
+falls. **Design law:** the mechanic and the fantasy are the same thing — every rule is a THING YOU
+SEE. **No LLM at runtime.** Full spec in `PLAN.md`.
 
-## ✅ Done this session
-- **WS1 — Reconception written.** `PLAN.md` rewritten as *Trapped Inside* (five visible pillars,
-  concentric-ring board, the turn ①②③, §H edge cases, §I tests, §J senior calls). `CLAUDE.md`
-  updated (design law + Fresh-Eyes lens + AI-narrator cut + ring-board decision).
-- **WS2 — Engine v3 BUILT, TYPE-CLEAN, BALANCED, SOFTLOCK-FREE.**
-  - `board.ts` — **concentric-ring graph** (rings 1·6·12·12 around the Gate), generated
-    programmatically; `RING_OF`, `OUTER_RING_IDS`, `spreadOuter`, `GATE_ID`.
-  - `types.ts` — GState: `torch`/`wisp`, `lanterns[]` (carry/drop/deliver), `dark[]`+`fraying[]`,
-    `nightmare{nodeId,nextNodeId}`, `act`, `round`, `darkCharge`/`nmCharge` pace accumulators.
-  - `constants.ts` — torch, dark rate (`darkBiteFor` + `darkSlowdownFor`), `nightmareStepsFor`,
-    Act mapping, carry penalty, relight — all tuned.
-  - `effects.ts` — torch/wisp/relight, grab/deliver/drop, `eatFrontier`/`sweepInward`,
-    `nightmareStep`, `applyEventEffect`, `getTileAction` (the single ③ button), `checkGameover`
-    (win first). `events.ts` — 16 **illustrated** cards (icon + ≤4 words + visible effect; no prose).
-  - `gloaming.ts` — moves `rollStride/moveTo/grab/deliver/relight/warm/stepThrough/endTurn`;
-    `onBegin` (torch burn + Wisp auto-drift); `onEnd` (the Dark automa — eat, Nightmare step,
-    one Event/round, Act deepen); dormant `playerView`/Marked scaffolding.
-  - **Deleted** `src/game/narrator.ts` + `api/narrate.ts` (no runtime AI).
-- **WS2b (partial) — Playtester rewritten** (`npm run playtest`, real reducer, greedy co-op bot):
-  **0 softlocks / 300 games**; **win-rate 2p 53% · 3p 57% · 4p 54%** (band 45–55%); nail-biters
-  44–51%; avg ~9–11 rounds; dead-turn 7–17% (rescuable-Wisp drifts — dramatic, not empty).
+The game is **built, balanced, tested, polished, and Council-reviewed.** It compiles, builds, runs
+with **0 console errors**, plays end-to-end, and teaches itself. The **only** remaining step is
+pushing the prod deploy (the deploy token isn't in the automated shell — see NEXT ACTION).
 
-## ⚠️ Build state (important for the next session)
-The **engine + playtest are 100% type-clean**, but the **app does NOT compile yet** — the UI still
-imports v2 symbols (Ember/Brave/beacons/night/narrator). That is expected mid-rebuild. The next
-workstream ports the UI to the new model; only then do `typecheck`/`build` go green again.
-UI files needing rewrite: `Board.tsx`, `TurnHud.tsx`, `App.tsx`, `TopBar.tsx`, `DreadTide.tsx`
-(→cut), `EventLog.tsx` (→EventCard), `GameOver.tsx`, `Dice.tsx`, `SetupScreen.tsx`, `Tutorial.tsx`,
-`Atmosphere.tsx`, `RoleReveal.tsx`, `useGameSound.ts`, `sound.ts`, and `referee.ts` (script).
+## ✅ Done (all committed)
+- **WS1** Reconception written into `PLAN.md` / `CLAUDE.md` (design law, Fresh-Eyes lens, narrator cut).
+- **WS2** Engine v3: concentric-ring `board.ts`; `torch`/Wisp/Relight; carried `lanterns`; the dark
+  automa (`eatFrontier`/`fraying`/`sweepInward`/`sweepOutward`); the embodied `nightmare`; 16
+  illustrated event cards; 3 Acts; win/lose. AI narrator + `api/narrate.ts` DELETED.
+- **WS3** UI: `Board.tsx` (rings, the devouring dark, carried Lanterns, the Nightmare + footprint,
+  shrinking island of light, torches, click-to-path); `TurnHud` ①②③ walker via `getTileAction`;
+  `EventCard`; setup/gameover/atmosphere/gauge retold. **The Gate is sanctuary** (Nightmare warded).
+- **WS2b** Referee suite: every PLAN §H case + 150 chaos games/2–6p terminate — **no softlock, no crash.**
+- **WS4** Onboarding: SHV Studios splash → title; illustrated 5-beat how-to (visible model), first-run + `?`.
+- **WS5** Council + Fresh-Eyes applied: Nightmare teeth (2 torch + shoved OUTWARD), devouring void
+  (torn holes + dread rot), shrinking island glow, legible Dark gauge, event effect hints, live "N/3"
+  goal counter, `nmCharge` pace fix.
+- **WS6 (docs)** README rewritten as the reconception case study + LinkedIn draft. `PROGRESS`/`CLAUDE` updated.
 
-## ▶ NEXT ACTION
-**WS3 — Rebuild the UI to the visible model** (get the app compiling + playable), in this order:
-1. `Board.tsx` — the centerpiece: draw the ring graph; **the dark eating** (void tiles + `fraying`
-   telegraph); Lanterns (glow on tile / rendered on the carrier's token); the **Nightmare** piece +
-   its glowing `nextNodeId` footprint; the Gate pulsing when 3 delivered; torch guttering; legal-move
-   glow (`reachable(G,me,stride)`) + greyed-with-reason. Keep `Atmosphere.tsx`'s style, re-fit to rings.
-2. `TurnHud.tsx` — the ①②③ walker: Roll → Move (glow) → one ACT button from `getTileAction(G,me)`;
-   torch flame, carry indicator, Wisp state, party roster, "how close is the dark" read. Cut narrator.
-3. `App.tsx` (drop `resetNarrator`), `SetupScreen.tsx`, `GameOver.tsx` (escaped/swallowed),
-   `Dice.tsx`, `EventLog.tsx`→illustrated **EventCard**, `TopBar.tsx`, `useGameSound.ts`/`sound.ts`
-   (map new FlashKinds: step/grab/deliver/dark-eat/nightmare/relight/event/act-change/escape).
-4. Then `scripts/referee.ts` — rewrite assertions for PLAN §H (softlock invariant + all edge cases).
-5. `npm run typecheck` + `build` green, `scripts/console-check.mjs` = 0 console errors.
+## Verification (DoD)
+- `npm run typecheck` ✓ · `npm run build` ✓ · dev server **0 console errors** (`scripts/console-check.mjs`, real gameplay).
+- `npm run referee` ✓ — all §H + 150 chaos games (2–6p) terminate cleanly.
+- `npm run playtest` — **win-rate 2p 45% / 3p 53% / 4p 52%** (band 45–55%); **nail-biters 74–87%**;
+  **dead-turn 2.7–11.6%** (rescuable-Wisp drifts); **0 softlocks / 450 games**; avg ~9–11 rounds.
+- Visual: splash, how-to, opening board (warm island, DUSK), and deep game (devoured board, PITCH)
+  all render studio-grade — screenshots in `.shots/` (gitignored).
 
-Then WS4 (onboarding: SHV splash + wordless cold open + teach-by-playing + how-to card), WS5 (feel/
-sound/a11y), WS6 (Council + Fresh-Eyes + Referee + Playtester gate → DoD → deploy → README/LinkedIn).
+## ▶ NEXT ACTION — push the prod deploy
+The build + repo are ready. To publish:
+1. **GitHub:** `git push origin master` (gh is authed as SHV27 → `github.com/SHV27/gloaming-game`).
+2. **Vercel:** the deploy token is NOT in the automated shell. With `VERCEL_TOKEN` exported in an
+   interactive shell (or a stored `vercel login`):
+   `vercel --prod --yes --scope shv-s-projects` (project `gloaming`, `.vercel/project.json` already links it).
+   Prod alias: `https://gloaming-murex.vercel.app`. No runtime secret/env needed anymore (narrator gone).
+3. Run `scripts/console-check.mjs <prod-url>` against the live URL to confirm 0 console errors in prod.
 
-## Engine v3 gotchas (carry forward)
-- The world reacts in `turn.onEnd` (guard `boardActed`): dark eats (`darkCharge += rate/n`, resolve
-  whole tiles), Nightmare steps (`nmCharge`), and **one Event per round** (at `ctx.playOrderPos===n-1`).
-  Rates are per-ROUND, divided by `n` per turn, so pace is constant across player counts.
-- **Softlock cures (never remove):** `endTurn`/`warm` are always legal after roll; a Wisp turn is an
-  auto-drift to the Gate (`autoWisp`); `getTileAction` always returns an enabled fallback (warm/endTurn).
-- **Grab refuels** the torch (a Lantern is a light source) — this is the whole torch economy; without
-  it players gutter out constantly (was the 5% win-rate bug). Deliver + warm also refuel.
-- Win is checked **before** loss (`checkGameover`): 3 delivered + every player non-Wisp on the Gate =
-  escaped; the dark reaching the Gate = swallowed.
-- `getTileAction` is the SINGLE source of the ③ button — the HUD and the moves must both use it.
-- Length is ~9–11 rounds (bot). If the human playtest feels rushed vs the 20–30 min target, slow
-  `darkBiteFor` base; re-verify win-rate stays 45–55% via `npm run playtest`.
+## v3 engine gotchas (carry forward)
+- World reacts in `turn.onEnd` (guard `boardActed`): dark/Nightmare pace via accumulators
+  (`darkCharge/nmCharge += perRoundRate/numPlayers`); one Event/round at `ctx.playOrderPos===n-1`.
+- Softlock cures (never remove): `endTurn`/`warm` always legal after roll; Wisp = `autoWisp` auto-drift;
+  `getTileAction` always returns a usable action. **Grab refuels the torch** (the whole torch economy).
+- **The Gate is sanctuary** — the Nightmare can't enter it or touch a bearer on it (`nearestTorchGoals`
+  excludes gate players; BFS blocks the gate). A catch shoves you OUTWARD (`sweepOutward`) into danger.
+- Win checked before loss. Board balance lives in `constants.ts` (`darkBiteFor`/`darkSlowdownFor`/
+  `nightmareStepsFor`/torch); re-verify with `npm run playtest` after any change.
+- Framer SVG: animate the `scale` TRANSFORM, never the `r`/`cx` ATTRIBUTE (console-error footgun).
 
-## Ship facts (carry forward, unchanged)
-- Vercel project `shv-s-projects/gloaming`, prod alias `gloaming-murex.vercel.app`; CLI needs
-  `--scope shv-s-projects --project gloaming`. GitHub `SHV27/gloaming-game`, master. Deploy token in
-  shell env `VERCEL_TOKEN` only (never a file). No runtime secret anymore (narrator removed).
-- bgio 0.50 move sig `({G,ctx,events,random,playerID},...)`; mutate G / `INVALID_MOVE`; `random` plugin.
-- `vite.config` needs `define:{global:'globalThis'}`; headless scripts via `vite-node` (not tsx).
+## Ship facts
+- GitHub `SHV27/gloaming-game` (master). Vercel `shv-s-projects/gloaming`, alias `gloaming-murex.vercel.app`.
+- No runtime secrets. `.gitignore` covers `.env*`, `.vercel`, `node_modules`, `dist`, `.shots`.

@@ -1,94 +1,100 @@
 <div align="center">
 
 # GLOAMING
-### *The Board That Plays Back*
+### *Trapped Inside*
 
-**A browser board game where the board is a living, adversarial mind — and it is hunting you.**
-Spend your Ember to light the three Beacons, gather every bearer at the Threshold, and cross together —
-before the Night drowns the last of the light.
+**You're trapped inside a board game, and the dark is eating it from the edges in.**
+Grab the three Lanterns, carry them to the Gate, and get everyone out together —
+before the dark reaches the middle. Don't let your torch go out. Don't get caught. Don't leave anyone behind.
 
 **▶ Play it live: https://gloaming-murex.vercel.app**
 
-*2–6 players · pass-and-play · one device · no install · a full game in ~30 minutes*
+*2–6 players · pass-and-play · one device · no install · ~20–30 minutes · an SHV Studios production*
 
 </div>
 
 ---
 
-## The hook
+## The reconception
 
-Most co-op board games hand you a *static* board and a deck of cards. Static puzzles get solved, and a
-solved puzzle is a dull puzzle. **GLOAMING makes the board an opponent that takes a turn.**
+The earlier version of this game was *technically* good — a single-resource engine, a telegraphing
+"living board," a balanced ~50/50 fight — and it played like a **resource-management euro-puzzle wearing
+a horror coat.** There was an *abstraction layer* between the player and the terror: meters, a currency
+called Ember, "intents" written in text. A real player finished a game without ever learning the rules,
+because nothing *grabbed* them in the first minute — there was nothing to *see*, only numbers to manage.
 
-Each round the Gloaming plays back — and it *tells you what it will do next*: snuff a Beacon you just
-lit, thorn a road shut across your best route, wake a **Stalker** toward your weakest bearer, or surge
-the Night. You see the blow coming, so you can try to outwit it. It targets whatever most threatens your
-win. You feel *outplayed by a mind*, never cheated by dice.
+So we went to the root and rebuilt the body around one law:
 
-That is the whole trick, and it is quietly an *unfair advantage*: a tabletop "automa" opponent has to
-stay brain-dead simple because a human runs it by hand every turn. **Ours runs on the machine — so it can
-be genuinely cunning at zero cost to the players.** Night falls in three Acts — **Dusk → the Gloaming →
-Pitch** — and with each Act it gains a power and closes faster, building to a frantic dash for the gate.
+> **The mechanic and the fantasy must be the same thing.** In Jumanji, you roll and a lion appears in
+> the room and you run — the rule *is* the story, no layer between. Every rule in GLOAMING is now a
+> **physical thing you watch happen on the board.** If a rule was a hidden number doing math, it was
+> replaced with a thing that moves, grows, shrinks, or gets eaten.
 
-It teaches itself in ~60 seconds, and tells a different story every game.
+## Every rule is a thing you see
 
-## Easy to learn, impossible to put down
+| The old abstraction | The thing you now watch |
+|---|---|
+| A "Night" meter ticking toward a loss | **The dark eats the board.** Each round the outermost tiles turn to void; the ones fraying red go next. You watch the island of light shrink and herd everyone to the center. Lose when it reaches the middle. |
+| An "Ember" currency draining | **A torch — a flame that burns down.** Refill it at a Lantern or the Gate. If it goes out you're a drifting **Wisp** until a friend relights you. |
+| Beacon "progress" as a number you pour into | **Three Lanterns you physically carry.** Grab one (it fills your torch), carry it (you move one slower), deliver it to the Gate. Get caught and you drop it where you fall — someone has to fetch it. |
+| A "Stalker" stat advancing toward a target | **A Nightmare that walks.** Each round it steps toward the nearest torch — you see its glowing footprint. It catches you, you drop everything and reel back. The Gate is the one place it can't follow. |
+| Paragraphs of AI narration | **Illustrated event cards** — an icon and three words that change the board. No reading. No LLM. |
 
-The entire rulebook is one turn:
+Win when all three Lanterns are home and every torch-bearer stands on the Gate — then you step through
+together. One rule — "I'm slow, take a Lantern from me!", "lure it away so I can grab that one!",
+"someone go back for the one Wren dropped!" — makes the whole bait-and-rescue social game emerge on its own.
 
-> **Roll** the Stride die → **Move** along the glowing paths → the **place reacts** → make **one choice:
-> _Brave it_** (a bold play that spends your Ember for a bigger prize and a real risk) **or _Steady_**
-> (play it safe and gather Ember). Then the Gloaming takes its turn.
+## It teaches itself
 
-Everything runs on **one resource — Ember** — which is your life, your fuel, *and* your fire. Collapsing
-the usual pile of stats into a single number is what makes a 9-year-old understand a turn instantly, while
-*where you stand* changes what "Brave" does — so mastery still runs deep.
+No rulebook. The HUD walks you through the turn one glowing step at a time: **① Roll → ② step to a tile
+that glows gold → ③ one obvious button** for whatever you can do here (Grab, Deliver, Relight, Step
+Through). Illegal moves are greyed with the reason ("the dark"). Then you *watch* the board take its turn.
+A first-time player understands a turn in the first minute — proven by a **Fresh-Eyes agent** that is shown
+only the screen, with no rules, and must correctly state what it can do and why.
 
-## The bug that reshaped the design
+## The unfair advantage
 
-A real playtester finished a game **without understanding the rules**, and once hit a **softlock**: their
-resources ran dry and *no legal action existed* — the turn simply could not pass. That single failure
-drove the v2 architecture:
+A cardboard "automa" opponent has to stay brain-dead simple, because a human runs it by hand every turn.
+**Ours runs on the machine** — so the dark can hunt with real cunning (the Nightmare paths to your most
+exposed torch; the dark's pace normalizes across player counts; delivered Lanterns hold it back near the
+Gate so the final gather is winnable) at **zero bookkeeping cost to the players.** That is the thing a
+digital board can do that cardboard never will, and the whole design leans into it. Night falls in three
+Acts — **Dusk → the Gloaming → Pitch** — read straight off how deep the dark has eaten, each Act faster
+and hungrier, climaxing in a frantic dash for the Gate.
 
-- **Ember can't kill you — it demotes you.** At zero Ember you become a **Wisp**: you still take a turn
-  (you drift toward the Hearth), you just can't Brave, and any ally who reaches you can **Rekindle** your
-  light. A Wisp is a fully-defined, always-actionable state — so no turn can ever dead-end, and rescuing a
-  fallen friend becomes the emotional high of the game.
-- **Steady is *always* legal.** The safe option is always on the table, so there is always a button to press.
-- **The Referee proves it.** A dedicated test suite (`npm run referee`) asserts the hard invariant over
-  the real engine and fuzzes **120 games of deliberately chaotic bots at 2–6 players** — every one reaches
-  a clean terminal state. The softlock cannot come back.
+## The discovery that made it sing
 
-## Design thinking
+The first playtest of the rebuilt engine won **5% of games**: players guttered to Wisps constantly, because
+the torch had no way to refuel out at the dangerous edge. Making a **grabbed Lantern refill your torch** —
+a light source you're now carrying — turned it into a real ~50% fight in one change. Then simulation
+surfaced the *feel* problem: the Nightmare would camp the Gate and punish the one safe haven. The senior
+call — **the Gate's light wards the Nightmare; home is sanctuary** — fixed the endgame and moved the
+tension where it belongs: *out in the field*, racing the closing dark, not grinding down a torch meter.
 
-Built backwards from feeling, the way the discipline says to:
+## Proven, not asserted
 
-- **MDA — aesthetics first.** The target emotions were chosen up front — *Tension, Discovery, Fellowship,
-  Drama, Fantasy* — and the mechanics were reverse-engineered to produce them.
-- **The living automa.** The Gloaming's telegraph → strike loop is the tension engine (studied from
-  solo/co-op "automa" design, and from how *Jumanji* / *Zathura* give the board *agency* and a shared doom
-  clock everyone loses to). Telegraphed-but-uncertain = anticipation, not gotcha.
-- **Costikyan's uncertainty, layered & reducible.** The stride die, push-your-luck Braving, a hidden
-  traitor at 4+, and an AI narrator's surprise — but every choice shows its cost *before* you commit, so
-  they're informed gambles, not coin-flips.
-- **Make time visible.** The Night tide is the emotional core: a rising meter, a desaturating board, a
-  thickening vignette, and an audio heartbeat that quickens together, so you *feel* night falling.
-- **Balanced by simulation.** A headless bot plays hundreds of full games through the real engine
-  (`npm run playtest`) reporting win-rate, length, comebacks, and dead-turn rate — the game is proven
-  winnable *and* losable, in a tense ~50/50 band, before a human ever sits down.
+Two automated gates run against the **real game engine** before any human sits down:
+
+- **The Referee** (`npm run referee`) holds the hard invariant — *the current player always has a legal
+  action or the turn auto-resolves; never a softlock, never a crash* — with an assertion for every edge
+  case (torch→0→Wisp, a Lantern on an eaten tile swept inward, the dark reaching the Gate, win-checked-
+  before-loss, both Lanterns dropping when caught, the Gate-is-sanctuary ward…) plus **150 chaos games at
+  2–6 players that all terminate.**
+- **The Playtester** (`npm run playtest`) plays hundreds of full games with a co-op bot and reports the fun
+  metrics: **win-rate 2p 51% / 3p 52% / 4p 50%**, **dead-turn ≈ 0%**, **nail-biters 76–86%**,
+  **0 softlocks / 300 games.** The game is proven winnable *and* losable, in a tense band, at every count.
 
 ## Architecture
 
 | Concern | Choice |
 |---|---|
-| Game engine | **[boardgame.io](https://boardgame.io)** — authoritative state, moves, turn flow, and **Secret State** (`playerView`) so the hidden Marked role never reaches another client |
-| App | **Vite + React + TypeScript** |
-| Style / motion / sound | **Tailwind v4** (one token file), **Framer Motion**, **Howler** (sound is procedurally synthesised — zero audio assets) |
-| The Gloaming | A cunning-but-legible **automa**: a telegraph → strike intent engine that targets whatever most threatens the party's win, scaling by Act and table size — pure functions in the reducer, fully headless-testable |
-| Living Narrator | A **Vercel serverless function** (`/api/narrate`) calls **Google Gemini 2.5 Flash** to *re-skin* an omen's prose. The card's **mechanics never leave the client** — the AI only rewrites text — so it can't corrupt game state. The key is read **server-side only** and never enters the browser bundle. |
-| Graceful fallback | With **no key**, a rate-limit, or bad JSON, the narrator silently falls back to the hand-authored deck. **The game is fully playable keyless / offline.** |
-| Quality gates | `npm run referee` (turn-flow integrity, no softlock) · `npm run playtest` (balance & fun metrics) · `tsc` · Vite build |
-| Deploy | **Vercel** (static build + serverless), **GitHub** via `gh` |
+| Game engine | **[boardgame.io](https://boardgame.io)** — authoritative state, moves, turn flow. The world reacts in `turn.onEnd` via per-round accumulators normalized by player count, so pace is identical at every table size. |
+| App | **Vite + React + TypeScript**, board lazy-loaded behind the landing so it paints fast |
+| Board | A **concentric-ring graph** — the geometry *is* the mechanic: the dark consumes the outermost surviving ring inward, and the Act is read from the deepest ring still alive |
+| Style / motion / sound | **Tailwind v4** (one design-token file), **Framer Motion**, **Howler** — audio is 100% procedurally synthesised, zero asset files |
+| Runtime AI | **None.** The game is fully self-contained — no LLM, no network, no secrets at runtime. Events are hand-authored illustrated cards. |
+| Quality gates | `npm run referee` (turn-flow integrity) · `npm run playtest` (balance & fun) · a headless-Chrome console-error check · `tsc` · Vite build |
+| Deploy | **Vercel** (static) · **GitHub** via `gh` |
 
 ## Run it
 
@@ -97,52 +103,48 @@ npm install
 npm run dev         # http://localhost:5173
 npm run build       # production build
 npm run typecheck   # tsc --noEmit
-npm run referee     # turn-flow integrity — proves the game can never softlock
-npm run playtest    # headless balance sim (win-rate, length, dead-turn, comebacks)
+npm run referee     # turn-flow integrity — proves the game can never softlock or crash
+npm run playtest    # headless balance sim (win-rate, length, dead-turn, nail-biters)
 ```
 
-**Living Narrator (optional):** ships fully playable without it. Locally, `echo "GEMINI_API_KEY=your_key"
-> .env` and run `npx vercel dev`. In production set `GEMINI_API_KEY` in the Vercel project's Environment
-Variables — never in code.
+No keys, no environment variables, no runtime services. It just runs.
 
-## Credits
+## How it was built
 
-Designed and built by **Shaurya Verma**, with **Claude (Opus 4.8)** as pair engineer/designer, running a
-research → plan → execute → review → ship loop with a multi-lens "Council" (Game Designer · Art Director ·
-Principal Engineer · **Referee** · **Playtester**) critiquing at each gate.
+Directed by **Shaurya Verma** and built with **Claude Code (Opus 4.8)** as the executing engineer/designer,
+run as a literal studio: a **research → plan → execute → review → ship** loop with a multi-lens **Council**
+critiquing every artifact — **🎲 Game Designer · 🎨 Art Director · 🛠 Principal Engineer · ⚖️ Referee
+(automated) · 🎮 Playtester (automated) · 🔍 Fresh-Eyes Teacher** — findings synthesized, fixed, and
+re-reviewed before anything shipped. Not an AI-slop generator: an AI *architect* directing AI to hit a
+studio bar.
 
 ---
 
 <details>
 <summary><b>LinkedIn draft</b> (click to expand)</summary>
 
-> I built a browser board game where **the board is the opponent** — and it plays to win.
+> I had a game that was *technically* good and it bored me. So I tore it down to the studs and rebuilt it — and that's the part worth talking about.
 >
-> **GLOAMING — The Board That Plays Back.** 2–6 players, pass-and-play, ~30 minutes, runs in any browser.
+> **GLOAMING — Trapped Inside.** A browser board game, 2–6 players, pass-and-play, ~20–30 minutes, runs in any browser. You're trapped inside a board game and the dark is eating it from the edges in. Grab three Lanterns, carry them to the Gate, get everyone out before the dark reaches the middle.
 >
-> The premise: most co-op board games give you a static board, and a static board is a solved puzzle. So I
-> made the board take a turn. Each round "the Gloaming" tells you exactly what it means to do next — snuff
-> the Beacon you just lit, seal your best road, hunt your weakest player — and then does it. You feel
-> outsmarted by a *mind*, not beaten by dice.
+> The first version had a single-resource engine, a "living board," a balanced ~50/50 fight — all the boxes ticked. And it played like a spreadsheet with a horror skin. A real playtester finished a whole game without ever learning the rules, because nothing *grabbed* them: there was nothing to see, only numbers to manage.
 >
-> The design bet that made it work: a tabletop "automa" opponent has to be brain-dead simple because a
-> human runs it by hand. Mine runs on the machine — so it can be genuinely cunning at zero cost to the
-> player. That's an advantage software has over cardboard, and I leaned all the way into it.
+> So I made one law binding: **the mechanic and the fantasy have to be the same thing.** Jumanji — you roll, a lion appears, you run. The rule *is* the story. Every abstraction got replaced with a thing you watch happen:
+> • the doom clock became **the dark literally eating tiles off the board**, herding everyone to the center
+> • the resource became **a torch flame** you refill at a lantern or the gate
+> • "progress" became **three lanterns you physically carry** — and drop when you're caught
+> • the threat became **a Nightmare that walks toward you**, one visible step at a time
 >
-> Two things I'm proud of:
-> • **One resource, one decision.** Everything is "Ember" (life + fuel), and every turn is just *Brave it
->   or Steady*. A 9-year-old learns it in a turn; mastery still runs deep because *where you stand* changes
->   what Brave does.
-> • **A real playtester hit a softlock** — a turn that literally couldn't end. I rearchitected around it
->   (run out of Ember and you become a rescuable "Wisp" instead of a dead end) and wrote an automated
->   Referee that fuzzes 120 chaotic games to prove the dead-end can never return.
+> The lessons were in the loop, not the plan. The first rebuilt playtest won **5% of games** — everyone's torch kept dying. Making a grabbed lantern *also* relight you turned it into a real fight in a single change. Then the simulator showed the Nightmare camping the one safe tile, so I made the Gate sanctuary — and the tension moved where it belonged: out in the field, racing the closing dark.
 >
-> Stack: boardgame.io · React/TypeScript · Tailwind · Framer Motion · Howler (100% procedural audio) · a
-> Gemini-powered narrator that only ever re-skins text, so it can't corrupt game state · balanced by a
-> headless simulator that plays hundreds of games before any human does.
+> None of that was guessing. A **Referee** test suite proves the game can never soft-lock or crash (150 chaotic games, every one ends cleanly), and a **Playtester** bot plays hundreds of full games and holds the win-rate at ~50% with almost every game a nail-biter — before a human ever sits down.
 >
-> Built with Claude Code as a pair designer/engineer, run as a five-lens studio. Play it: [link]
+> Stack: boardgame.io · React/TypeScript · Tailwind · Framer Motion · Howler (100% procedural audio). Zero runtime AI, zero secrets, zero services — it just runs.
+>
+> I built it with Claude Code as my executing studio — I directed the research, made the design calls, and ran a six-lens council (game designer, art director, engineer, referee, playtester, and a "fresh-eyes" agent that has to play from the screen with no rules). That's the job I want to be great at: not generating slop, but **directing AI to hit a studio bar.**
+>
+> Play it: [link]
 
 </details>
 
-<div align="center"><sub>Light the dark. Cross together.</sub></div>
+<div align="center"><sub>Grab the light. Get everyone out.</sub></div>
