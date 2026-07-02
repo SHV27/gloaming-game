@@ -97,6 +97,7 @@ export interface LogEntry {
   turn: number;
   text: string;
   tone: LogTone;
+  count?: number; // consecutive identical lines collapse into one with a count
 }
 
 // ── Beats — the structured cause→effect record (S6, Pillar 1). One system, three
@@ -122,6 +123,7 @@ export interface Beat {
   tone: LogTone;
   kind: BeatKind;
   seat?: number; // whose beat (for the accent color)
+  count?: number; // consecutive identical beats collapse into one with a count
 }
 
 // ── UI cue channel (drives shake / bloom / sound off pure state) ─────────────

@@ -251,19 +251,19 @@ function HeroSilhouette({ motif, color }: { motif: string; color: string }) {
           </g>
         </g>
       );
-    case 'emberheart': // a figure with a glowing heart, hands cupped
+    case 'emberheart': // a line figure with a small glowing heart at the chest
       return (
         <g>
           <circle cx="50" cy="26" r="9" fill={color} />
           <g {...line}>
             <path d="M50 35 V74" />
             <path d="M50 74 L40 100 M50 74 L60 100" />
-            <path d="M50 50 L34 66 M50 50 L66 66" />
+            <path d="M50 52 L34 66 M50 52 L66 66" />
           </g>
           <path
-            d="M50 52 c -6 -8 -18 -2 -12 8 c 3 6 12 10 12 12 c 0 -2 9 -6 12 -12 c 6 -10 -6 -16 -12 -8 z"
+            d="M50 40 c -3.5 -4.5 -10 -1 -7 4.5 c 1.6 3 7 6 7 7 c 0 -1 5.4 -4 7 -7 c 3 -5.5 -3.5 -9 -7 -4.5 z"
             fill={color}
-            style={{ filter: `drop-shadow(0 0 8px ${color})` }}
+            style={{ filter: `drop-shadow(0 0 6px ${color})` }}
           />
         </g>
       );

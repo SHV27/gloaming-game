@@ -87,10 +87,15 @@ export function DarkColumn({
           {ACT_NAMES[act]}
         </div>
         {/* honest forecast — exactly what the fraying marks show */}
-        <div className="mt-1 font-display text-[11px] leading-none text-dread-bright" title={`The dark eats ${forecast} tile${forecast === 1 ? '' : 's'} next round`}>
+        <motion.div
+          className="mt-1 font-display text-base font-bold leading-none text-dread-bright text-glow-dread"
+          title={`The dark eats ${forecast} tile${forecast === 1 ? '' : 's'} next round`}
+          animate={near ? { scale: [1, 1.12, 1] } : { scale: 1 }}
+          transition={near ? { duration: 1.4, repeat: Infinity, ease: 'easeInOut' } : undefined}
+        >
           −{forecast}
-        </div>
-        <div className="font-body text-[7px] leading-tight text-fog-dim">next round</div>
+        </motion.div>
+        <div className="font-body text-[7px] leading-tight text-fog-dim">tiles next round</div>
         <div className="mt-0.5 font-body text-[8px] leading-tight text-fog-dim">reaches the Gate = lost</div>
       </div>
     </div>

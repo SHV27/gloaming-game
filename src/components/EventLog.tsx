@@ -104,6 +104,7 @@ export function EventLog({ G, currentPlayer }: { G: GState; currentPlayer: strin
               style={{ color: TONE_COLOR[e.tone] }}
             >
               {e.text}
+              {e.count && e.count > 1 && <span className="text-fog-dim"> ×{e.count}</span>}
             </motion.p>
           ))}
         </div>

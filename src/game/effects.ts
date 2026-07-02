@@ -31,7 +31,13 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
 
 // ── logging / cues ──────────────────────────────────────────────────────────
 export function log(G: GState, text: string, tone: LogTone = 'neutral'): void {
-  G.log.push({ id: G.logSeq++, turn: G.round, text, tone });
+  const last = G.log[G.log.length - 1];
+  if (last && last.text === text) {
+    last.count = (last.count ?? 1) + 1; // collapse a repeat instead of copy-pasting it
+    last.turn = G.round;
+    return;
+  }
+  G.log.push({ id: G.logSeq++, turn: G.round, text, tone, count: 1 });
   if (G.log.length > 60) G.log.shift();
 }
 export function flash(G: GState, kind: FlashKind, nodeId?: number): void {
@@ -40,7 +46,13 @@ export function flash(G: GState, kind: FlashKind, nodeId?: number): void {
 /** Record a cause→effect beat — the structured record behind the banner, the
  *  turn-log strip, and the Match Story (S6, Pillar 1). */
 export function beat(G: GState, b: Omit<Beat, 'id' | 'round'>): void {
-  G.beats.push({ ...b, id: G.beatSeq++, round: G.round });
+  const last = G.beats[G.beats.length - 1];
+  if (last && last.cause === b.cause && last.effect === b.effect && last.kind === b.kind) {
+    last.count = (last.count ?? 1) + 1; // collapse a repeat (e.g. the Hollow One catching the same soul)
+    last.round = G.round;
+    return;
+  }
+  G.beats.push({ ...b, id: G.beatSeq++, round: G.round, count: 1 });
   if (G.beats.length > 40) G.beats.shift();
 }
 

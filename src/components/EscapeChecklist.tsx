@@ -15,9 +15,9 @@ export function EscapeChecklist({ G }: { G: GState }) {
   const lit = players.filter((p) => !p.wisp).length;
 
   const items = [
-    { key: 'lanterns', label: 'Lanterns', have: G.lanternsDelivered, need: LANTERN_COUNT, glyph: 'lantern' as const },
-    { key: 'gather', label: 'At the Gate', have: atGate, need: total, glyph: 'party' as const },
-    { key: 'lit', label: 'Torches lit', have: lit, need: total, glyph: 'flame' as const },
+    { key: 'lanterns', label: 'Lanterns delivered', short: 'Lanterns', have: G.lanternsDelivered, need: LANTERN_COUNT, glyph: 'lantern' as const },
+    { key: 'gather', label: 'Everyone at the Gate', short: 'Home', have: atGate, need: total, glyph: 'party' as const },
+    { key: 'lit', label: 'Torches still lit (no Wisps)', short: 'Lit', have: lit, need: total, glyph: 'flame' as const },
   ];
 
   return (
@@ -26,6 +26,7 @@ export function EscapeChecklist({ G }: { G: GState }) {
       title="What you need to escape: 3 Lanterns delivered · everyone at the Gate · no one a Wisp"
       aria-label="Escape checklist"
     >
+      <span className="hidden pl-1.5 font-display text-[8px] uppercase tracking-[0.2em] text-fog-dim lg:inline">To escape</span>
       {items.map((it) => {
         const done = it.have >= it.need;
         const color = done ? 'var(--color-ember-bright)' : 'var(--color-fog-dim)';
@@ -46,6 +47,7 @@ export function EscapeChecklist({ G }: { G: GState }) {
             >
               <ChecklistGlyph glyph={it.glyph} color={color} />
             </motion.svg>
+            <span className="hidden font-body text-[9px] uppercase tracking-wide text-fog md:inline">{it.short}</span>
             <span className="font-display text-[11px] tabular-nums" style={{ color }}>
               {it.have}/{it.need}
             </span>

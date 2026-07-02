@@ -93,7 +93,10 @@ export function BeatStrip({ beats }: { beats: Beat[] }) {
           <span className="font-display uppercase" style={{ color: b.seat != null ? SEAT_COLORS[b.seat] : TONE_COLOR[b.tone], fontSize: 9.5 }}>
             {b.cause}
           </span>
-          <span className="truncate text-parchment/70">{b.effect}</span>
+          <span className="truncate text-parchment/70">
+            {b.effect}
+            {b.count && b.count > 1 && <span className="text-fog-dim"> ×{b.count}</span>}
+          </span>
         </div>
       ))}
     </div>
