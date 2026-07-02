@@ -38,7 +38,9 @@ async function click(text) {
 console.log('loading', URL);
 await page.goto(URL, { waitUntil: 'networkidle2', timeout: 45000 });
 await sleep(1200);
-await click('skip');            // dismiss tutorial
+await click('skip');            // dismiss the SHV splash
+await sleep(900);
+await click('skip');            // dismiss the how-to tutorial
 await sleep(500);
 await click('into the dusk');   // start a 2p (default) game
 await sleep(1800);

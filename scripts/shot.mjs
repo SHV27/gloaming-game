@@ -28,9 +28,11 @@ const browser = await puppeteer.launch({
 const page = await browser.newPage();
 await page.goto('http://localhost:5173/', { waitUntil: 'networkidle2', timeout: 30000 });
 await sleep(1400);
-await page.screenshot({ path: `${OUT}/01-setup-or-tutorial.png` });
+await page.screenshot({ path: `${OUT}/01-splash.png` });
 
-await clickText(page, 'skip');
+await clickText(page, 'skip'); // dismiss the SHV splash
+await sleep(900);
+await clickText(page, 'skip'); // dismiss the how-to tutorial
 await sleep(700);
 await page.screenshot({ path: `${OUT}/02-setup.png` });
 
@@ -46,8 +48,8 @@ await clickText(page, 'understand the dark'); // dismiss Marked reveal if presen
 await sleep(700);
 await page.screenshot({ path: `${OUT}/04-board.png` });
 
-// play several full turns so the dark eats, the nightmare walks, an event flips
-for (let t = 0; t < 6; t++) {
+// play many full turns so the dark eats deep, the nightmare walks, events flip
+for (let t = 0; t < 16; t++) {
   await clickText(page, 'roll to move');
   await sleep(700);
   // tap a reachable tile (a role=button node on the svg)
