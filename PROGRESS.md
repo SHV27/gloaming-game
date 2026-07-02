@@ -16,13 +16,20 @@ plannable future (+ the Grandmaster skill-gap proof). **No LLM at runtime. No en
 ## ✅ Done (S6)
 - **WS1** Baseline re-verified green (typecheck ✓ · referee ✓ 150/150 · playtest 2p45/3p55/4p51, 0 softlocks).
   `PLAN.md` rewritten to v4 (The Crowning); `CLAUDE.md` updated (rules-budget law §0, S6 §11 log entry).
+- **WS2** Heroes shipped. `heroes.ts` (5 passive one-liners); `Player.hero`; hooks wired in effects/gloaming
+  (`strideFor(+1 / carry-0)`, Ember-Hearted adjacency relight, `nightmareGoals` excludes the *empty-handed*
+  Unseen, Stubborn half-burn). `HeroSelect.tsx` (silhouette art, hotseat pick order); threaded App→GameMount→
+  client→setup; HUD hero line + roster labels. **Unseen rebalanced**: "overlooked *until you carry a Lantern*"
+  (immunity was 96%/+18.8 spread → now a bait/rescuer). Balance **2p50/3p51/4p57, per-hero spread 4.6 (≤±8),
+  nail 69–78%, 0 softlocks**; referee H12/H14 ✓; build ✓; console-check ✓ 0 errors. (3p dark table-mult 0.95→1.0.)
 
 ## ▶ NEXT ACTION
-**WS2 — Heroes.** Create `src/game/heroes.ts` (5 passive one-line heroes: swift/lamplighter/emberheart/
-unseen/stubborn); add `Player.hero`; wire hooks (`strideFor` +1 / carry-0; relight adjacency; exclude from
-`nightmareGoals`; onBegin half-burn); build `HeroSelect.tsx`; thread heroes through App→GameMount→client→setup;
-add visible-in-play cues. Then `npm run playtest` with random heroes (band 45–55%, per-hero spread ≤±8) and
-`npm run referee` (H12 Unseen-all, H14 Ember-Hearted adjacency). Commit + checkpoint.
+**WS3 — The Hollow One (the Nightmare, crowned).** Add `nightmare.path: number[]` (full BFS route, `path[0]==
+nextNodeId`); in `nightmareStep` compute + store it. **Pitch (Act 2) bearer-hunting**: `nightmareGoals` prefers
+non-hidden Lantern-bearers, fallback nearest torch, fallback idle (referee H13 — never strand). Board: draw the
+full path as a fading footfall trail; act-evolution of the Hollow One token (Dusk shape→Gloaming wakes→Pitch
+hunts); presence (face target, lock-on flourish); the **name** in how-to + fog + act titles. Re-balance
+(`npm run playtest`) — bearer-hunting will lower win-rate; keep band. Referee + commit.
 
 ## S6 workstreams (see PLAN §J)
 1. ✅ WS1 baseline + PLAN v4 + CLAUDE.md.  2. WS2 Heroes.  3. WS3 The Hollow One.  4. WS4 Plannable future +

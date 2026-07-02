@@ -7,6 +7,7 @@ import { Button } from '../ui/Button';
 import { EventCardView } from './EventCard';
 import { getTileAction } from '../game/effects';
 import { eventById } from '../game/events';
+import { heroById } from '../game/heroes';
 import { SEAT_COLORS, TORCH_MAX, LANTERN_COUNT } from '../game/constants';
 
 /** The turn HUD — walks the player through ① ROLL → ② MOVE → ③ ACT, one glowing
@@ -77,6 +78,17 @@ export function TurnHud({
               {me.carrying.length > 0 && <span className="ml-2 text-xs text-ember-bright">· carrying {me.carrying.length}</span>}
             </div>
             <TorchBar torch={me.torch} wisp={me.wisp} />
+            {(() => {
+              const hero = heroById(me.hero);
+              return hero ? (
+                <div className="mt-0.5 font-body text-[10px] leading-tight" title={hero.ability}>
+                  <span className="font-display uppercase tracking-wide" style={{ color: hero.accent }}>
+                    {hero.name}
+                  </span>
+                  <span className="text-fog-dim"> · {hero.ability}</span>
+                </div>
+              ) : null;
+            })()}
           </div>
         </div>
 

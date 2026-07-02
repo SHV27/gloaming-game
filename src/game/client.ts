@@ -1,6 +1,7 @@
 import { Client } from 'boardgame.io/react';
 import { Local } from 'boardgame.io/multiplayer';
 import { makeGloaming } from './gloaming';
+import type { HeroId } from './heroes';
 import { GloamingBoard } from '../components/Board';
 
 /**
@@ -8,9 +9,12 @@ import { GloamingBoard } from '../components/Board';
  * one device; App swaps the `playerID` prop behind a handoff interstitial so
  * the previous bearer's screen is never on display (hidden-info safe → S2).
  */
-export function makeGloamingClient(names: string[], opts: { marked?: boolean } = {}) {
+export function makeGloamingClient(
+  names: string[],
+  opts: { marked?: boolean; heroes?: HeroId[] } = {},
+) {
   return Client({
-    game: makeGloaming({ names, marked: opts.marked }),
+    game: makeGloaming({ names, marked: opts.marked, heroes: opts.heroes }),
     board: GloamingBoard,
     numPlayers: names.length,
     multiplayer: Local(),

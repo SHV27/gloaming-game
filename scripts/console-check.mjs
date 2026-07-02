@@ -42,7 +42,13 @@ await click('skip');            // dismiss the SHV splash
 await sleep(900);
 await click('skip');            // dismiss the how-to tutorial
 await sleep(500);
-await click('into the dusk');   // start a 2p (default) game
+await click('into the dusk');   // SetupScreen → hero select
+await sleep(900);
+await click('the swift');       // seat 0 picks a hero (auto-advances)
+await sleep(400);
+await click('the swift');       // seat 1 picks a hero
+await sleep(500);
+await click('into the dusk');   // HeroSelect → start a 2p game
 await sleep(1800);
 await click('reveal my turn');  // handoff
 await sleep(700);

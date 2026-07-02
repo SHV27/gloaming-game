@@ -8,7 +8,10 @@ export interface ShellApi {
   names: string[];
   /** Advance the on-device seat to `seat` once the handoff is acknowledged. */
   gotoSeat: (seat: string) => void;
+  /** Full reset — back to setup. */
   restart: () => void;
+  /** Keep the roster, return to hero select for a fresh run (Match Story). */
+  changeHeroes: () => void;
 }
 
 export const ShellContext = createContext<ShellApi | null>(null);

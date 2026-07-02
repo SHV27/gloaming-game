@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import type { GState, LogTone } from '../game/types';
 import { SEAT_COLORS, TORCH_MAX } from '../game/constants';
+import { heroById } from '../game/heroes';
 import { Panel, PanelTitle } from '../ui/Panel';
 
 const TONE_COLOR: Record<LogTone, string> = {
@@ -32,21 +33,30 @@ export function EventLog({ G, currentPlayer }: { G: GState; currentPlayer: strin
             >
               <span className="flex items-center gap-2">
                 <span
-                  className="h-2.5 w-2.5 rounded-full"
+                  className="h-2.5 w-2.5 shrink-0 rounded-full"
                   style={{ background: p.wisp ? '#3a3550' : SEAT_COLORS[p.seat], opacity: p.wisp ? 0.5 : 1 }}
                 />
-                <span
-                  className="font-display text-xs"
-                  style={{ color: p.wisp ? '#8a84a8' : SEAT_COLORS[p.seat] }}
-                >
-                  {p.name}
-                </span>
-                {p.wisp && <span className="text-[10px] text-fog">a Wisp</span>}
-                {p.carrying.length > 0 && (
-                  <span className="rounded bg-ember/20 px-1 text-[9px] font-display text-ember-bright" title="carrying a Lantern">
-                    ◈{p.carrying.length > 1 ? `×${p.carrying.length}` : ''}
+                <span className="flex min-w-0 flex-col leading-tight">
+                  <span className="flex items-center gap-1.5">
+                    <span
+                      className="font-display text-xs"
+                      style={{ color: p.wisp ? '#8a84a8' : SEAT_COLORS[p.seat] }}
+                    >
+                      {p.name}
+                    </span>
+                    {p.wisp && <span className="text-[10px] text-fog">a Wisp</span>}
+                    {p.carrying.length > 0 && (
+                      <span className="rounded bg-ember/20 px-1 text-[9px] font-display text-ember-bright" title="carrying a Lantern">
+                        ◈{p.carrying.length > 1 ? `×${p.carrying.length}` : ''}
+                      </span>
+                    )}
                   </span>
-                )}
+                  {heroById(p.hero) && (
+                    <span className="truncate font-body text-[9px] text-fog-dim" title={heroById(p.hero)!.ability}>
+                      {heroById(p.hero)!.name}
+                    </span>
+                  )}
+                </span>
               </span>
               <span className="font-display text-[11px] text-fog" aria-label={p.wisp ? 'torch out' : `torch ${p.torch} of ${TORCH_MAX}`}>
                 {p.wisp ? (

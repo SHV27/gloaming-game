@@ -9,6 +9,7 @@ import type {
   Act,
 } from './types';
 import { RING_OF, OUTER_RING } from './board';
+import type { HeroId } from './heroes';
 import {
   TORCH_MAX,
   MOVE_DARK_COST,
@@ -61,7 +62,12 @@ export function toWisp(G: GState, p: Player): void {
 export function relight(G: GState, rescuer: Player, wispId: string): boolean {
   const t = G.players[wispId];
   if (!t || !t.wisp || t.id === rescuer.id) return false;
-  if (t.nodeId !== rescuer.nodeId) return false;
+  // THE EMBER-HEARTED reaches one tile over; everyone else must share the tile.
+  const adjacent =
+    rescuer.hero === 'emberheart' &&
+    G.nodes[rescuer.nodeId].neighbors.includes(t.nodeId) &&
+    !isVoid(G, t.nodeId);
+  if (t.nodeId !== rescuer.nodeId && !adjacent) return false;
   t.wisp = false;
   t.torch = RELIGHT_TORCH;
   flash(G, 'relight', t.nodeId);
@@ -249,16 +255,23 @@ export function reachable(G: GState, from: number, stride: number): Set<number> 
 
 // ── The Nightmare (embodied hunter) ─────────────────────────────────────────
 const nonWisp = (G: GState) => Object.values(G.players).filter((p) => !p.wisp);
-/** The Nightmare hunts torches OUT in the field — the Gate's light is sanctuary,
- *  so a bearer standing on the Gate is safe and never a target (PLAN §B.4). */
-function nearestTorchGoals(G: GState): Set<number> {
-  return new Set(nonWisp(G).filter((p) => p.nodeId !== G.gateId).map((p) => p.nodeId));
+/** Who the Hollow One will hunt. The Gate's light is sanctuary (a bearer on the
+ *  Gate is never a target, PLAN §B.4), and THE UNSEEN is overlooked *while empty-
+ *  handed* — pick up a Lantern and its light gives you away (it can still be
+ *  stumbled into en route — resolved on arrival, not here). In Pitch it prefers a
+ *  Lantern-bearer (WS3 crowning); the fallback chain can never strand it (H13). */
+function isHidden(p: Player): boolean {
+  return p.hero === 'unseen' && p.carrying.length === 0;
+}
+function nightmareGoals(G: GState): Set<number> {
+  const exposed = nonWisp(G).filter((p) => p.nodeId !== G.gateId && !isHidden(p));
+  return new Set(exposed.map((p) => p.nodeId));
 }
 /** One step of the Nightmare toward the nearest exposed torch; resolves a catch on
  *  arrival. It can never step onto the Gate (the last light wards it). */
 export function nightmareStep(G: GState): void {
   const wardsGate = (id: number) => id === G.gateId;
-  const goals = nearestTorchGoals(G);
+  const goals = nightmareGoals(G);
   if (goals.size === 0) {
     G.nightmare.nextNodeId = null;
     return; // everyone's home or a Wisp — the Nightmare has nothing to chase
@@ -280,7 +293,7 @@ export function nightmareStep(G: GState): void {
     );
   }
   // telegraph the next footfall
-  const g2 = nearestTorchGoals(G);
+  const g2 = nightmareGoals(G);
   G.nightmare.nextNodeId = g2.size ? bfsNextStep(G, G.nightmare.nodeId, g2, (id) => id === G.gateId) : null;
 }
 
@@ -356,15 +369,23 @@ export function getTileAction(G: GState, p: Player): TileAction {
       enabled: true,
       preview: 'Carry it to the Gate · you move 1 slower',
     };
-  // 4 · RELIGHT a fallen ally sharing this tile (rescue beats waiting)
-  const wisp = Object.values(G.players).find((q) => q.wisp && q.nodeId === p.nodeId && q.id !== p.id);
+  // 4 · RELIGHT a fallen ally sharing this tile (rescue beats waiting). THE
+  //     EMBER-HEARTED can also reach a Wisp one tile over (its whole ability).
+  const sameTileWisp = Object.values(G.players).find((q) => q.wisp && q.nodeId === p.nodeId && q.id !== p.id);
+  const adjWisp =
+    !sameTileWisp && p.hero === 'emberheart'
+      ? Object.values(G.players).find(
+          (q) => q.wisp && q.id !== p.id && G.nodes[p.nodeId].neighbors.includes(q.nodeId) && !isVoid(G, q.nodeId),
+        )
+      : undefined;
+  const wisp = sameTileWisp ?? adjWisp;
   if (wisp)
     return {
       kind: 'relight',
       label: `Relight ${wisp.name}`,
       enabled: true,
       targetId: wisp.id,
-      preview: `Bring them back with ${RELIGHT_TORCH} torch`,
+      preview: `Bring them back with ${RELIGHT_TORCH} torch${adjWisp ? ' — from the next tile' : ''}`,
     };
   // 5 · WARM your torch at the Gate
   if (onGate && p.torch < TORCH_MAX)
@@ -381,8 +402,12 @@ export function getTileAction(G: GState, p: Player): TileAction {
 }
 
 // ── stride helpers ──────────────────────────────────────────────────────────
-export function strideFor(roll: number, carrying: number): number {
-  return Math.max(MIN_STRIDE, roll - carrying * LANTERN_CARRY_STRIDE_PEN);
+/** Steps this roll grants. THE LAMPLIGHTER ignores Lantern weight; THE SWIFT
+ *  always gains +1 (both abilities are visible right here in the reach glow). */
+export function strideFor(roll: number, carrying: number, hero?: HeroId): number {
+  const pen = hero === 'lamplighter' ? 0 : carrying * LANTERN_CARRY_STRIDE_PEN;
+  const swift = hero === 'swift' ? 1 : 0;
+  return Math.max(MIN_STRIDE, roll - pen) + swift;
 }
 /** Torch cost to step INTO a tile (frayed edge tiles bite). */
 export function stepTorchCost(G: GState, toNodeId: number): number {

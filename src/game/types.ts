@@ -5,6 +5,8 @@
  * Hidden-role (4+) scaffolding stays dormant on boardgame.io `playerView`.
  */
 
+import type { HeroId } from './heroes';
+
 export type NodeType = 'gate' | 'tile';
 
 export interface BoardNode {
@@ -27,6 +29,7 @@ export interface Player {
   torch: number; // the flame, 0..TORCH_MAX — burns down each round
   wisp: boolean; // torch hit 0 — drifts to the Gate, cannot act, Relight-able
   carrying: number[]; // lantern ids held right now (weight → slower)
+  hero?: HeroId; // S6 — one passive, always-on, visible ability (see heroes.ts)
   role?: Role;
 }
 

@@ -21,6 +21,7 @@ import {
   nightmareStep,
   dropCarried,
   getTileAction,
+  relight,
 } from '../src/game/effects';
 import { RING_OF, OUTER_RING, GATE_ID } from '../src/game/board';
 import { LANTERN_COUNT } from '../src/game/constants';
@@ -279,6 +280,71 @@ section('Softlock fuzz: every game reaches a terminal state (H2, H3)');
   }
   assert(terminated === GAMES, `all ${GAMES} chaos games terminated (got ${terminated}) — NO SOFTLOCK`);
   console.log(`  · ${terminated}/${GAMES} chaos games reached a terminal state`);
+}
+
+// ── §H.12 — THE UNSEEN: all exposed players Unseen → the Hollow One idles (no crash) ─
+section('All-Unseen table → the Hollow One has no target, never crashes (H12)');
+{
+  const G = freshG(2);
+  for (const p of Object.values(G.players)) {
+    p.hero = 'unseen';
+    p.nodeId = G.nodes.find((n) => RING_OF[n.id] === 2)!.id; // out in the field, exposed
+    p.wisp = false;
+  }
+  G.nightmare.nodeId = G.nodes.find((n) => RING_OF[n.id] === 1)!.id;
+  for (let i = 0; i < 8; i++) nightmareStep(G); // must not throw, must not snuff an Unseen it isn't hunting
+  assert(G.nightmare.nextNodeId === null, 'no telegraph when every exposed torch is Unseen');
+  assert(Object.values(G.players).every((p) => !p.wisp), 'the Unseen are never hunted down');
+  // a full all-Unseen game still terminates (the dark ends it)
+  const c = Client({ game: makeGloaming({ names: NAMES.slice(0, 2), heroes: ['unseen', 'unseen'] }), numPlayers: 2 });
+  c.start();
+  let guard = 0;
+  let ended = false;
+  while (guard++ < 4000) {
+    const st = c.getState()!;
+    if (st.ctx.gameover) { ended = true; break; }
+    const pid = st.ctx.currentPlayer;
+    c.updatePlayerID(pid);
+    const Gs = st.G as GState;
+    if (Gs.autoWisp) c.moves.endTurn();
+    else { c.moves.rollStride(); c.moves.endTurn(); }
+  }
+  assert(ended, 'an all-Unseen table still reaches a terminal state');
+}
+
+// ── §H.14 — THE EMBER-HEARTED relights a Wisp one tile over (incl. the Gate edge) ─
+section('Ember-Hearted adjacency Relight (H14)');
+{
+  const G = freshG(2);
+  const rescuer = G.players['0'];
+  const fallen = G.players['1'];
+  rescuer.hero = 'emberheart';
+  const tile = G.nodes.find((n) => RING_OF[n.id] === 2 && !isVoid(G, n.id))!;
+  rescuer.nodeId = tile.id;
+  const neigh = tile.neighbors.find((m) => !isVoid(G, m) && m !== GATE_ID)!;
+  fallen.nodeId = neigh;
+  fallen.wisp = true;
+  fallen.torch = 0;
+  const a = getTileAction(G, rescuer);
+  assert(a.kind === 'relight' && a.targetId === '1', 'Ember-Hearted is offered a relight for the adjacent Wisp');
+  // a non-Ember-Hearted rescuer is NOT offered the adjacent relight
+  const G2 = freshG(2);
+  G2.players['0'].hero = 'swift';
+  G2.players['0'].nodeId = tile.id;
+  G2.players['1'].nodeId = neigh;
+  G2.players['1'].wisp = true;
+  G2.players['1'].torch = 0;
+  assert(getTileAction(G2, G2.players['0']).kind !== 'relight', 'a non-Ember-Hearted rescuer cannot relight across tiles');
+  // across the Gate boundary: Ember-Hearted next to the Gate, Wisp on the Gate → legal, no softlock
+  const G3 = freshG(2);
+  G3.players['0'].hero = 'emberheart';
+  const gateNeighbor = G3.nodes[GATE_ID].neighbors.find((m) => !isVoid(G3, m))!;
+  G3.players['0'].nodeId = gateNeighbor;
+  G3.players['1'].nodeId = GATE_ID;
+  G3.players['1'].wisp = true;
+  G3.players['1'].torch = 0;
+  const back = relight(G3, G3.players['0'], '1');
+  assert(back && !G3.players['1'].wisp, 'Ember-Hearted relights a Wisp resting on the Gate from the next tile');
 }
 
 // ── verdict ──────────────────────────────────────────────────────────────────

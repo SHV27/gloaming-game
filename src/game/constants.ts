@@ -35,7 +35,7 @@ export const MIN_STRIDE = 1; // never fully immobilised by carrying
 //    the reducer accumulates it and resolves whole tiles). Accelerates each Act.
 export function darkBiteFor(act: Act, numPlayers: number): number {
   const base = [2.7, 3.7, 4.7][act];
-  const byTable = numPlayers === 2 ? 0.87 : numPlayers === 3 ? 0.95 : numPlayers >= 5 ? 1.2 : 1.08;
+  const byTable = numPlayers === 2 ? 0.87 : numPlayers === 3 ? 1.0 : numPlayers >= 5 ? 1.2 : 1.08;
   return base * byTable; // small tables gentler; big tables eat faster (they have more hands)
 }
 /** Delivered Lanterns are a growing light at the Gate that holds the dark back a

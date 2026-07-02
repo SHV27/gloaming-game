@@ -1,9 +1,14 @@
 /**
- * GLOAMING v3 — *Trapped Inside*. Headless Playtester over the REAL reducer.
+ * GLOAMING v4 — *Trapped Inside*. Headless Playtester over the REAL reducer.
  * A greedy co-op bot (≈ a reasonable human: fetch Lanterns, deliver, rescue,
  * gather, escape) plays many full games per player count and reports the fun
  * metrics (PLAN §I): win-rate ~45–55%, length ~20–30 min, dead-turn ≈ 0,
  * comebacks + nail-biters present. Also the softlock guard: every game terminates.
+ *
+ * S6: every game assigns RANDOM heroes (Pillar 3), and we report the per-hero
+ * win-rate spread (must stay ≤ ±8 pts — no mandatory pick, no trap pick).
+ * The Grandmaster gap (a smart bot vs this greedy one, ≥ +15 pts) lives in
+ * `scripts/grandmaster.ts`.
  *
  * Run with the Vite resolver:  npm run playtest
  */
@@ -12,6 +17,7 @@ import { makeGloaming } from '../src/game/gloaming';
 import type { GState } from '../src/game/types';
 import { getTileAction, isVoid } from '../src/game/effects';
 import { LANTERN_COUNT, SEAT_NAMES } from '../src/game/constants';
+import { HERO_IDS, type HeroId } from '../src/game/heroes';
 import { RING_OF } from '../src/game/board';
 
 type AnyClient = ReturnType<typeof Client>;
@@ -117,11 +123,15 @@ interface Result {
   totalTurns: number;
   nailBiter: boolean;
   softlock: boolean;
+  perPlayer: { hero: HeroId; won: boolean }[];
 }
+
+const rndHero = (): HeroId => HERO_IDS[Math.floor(Math.random() * HERO_IDS.length)];
 
 function playGame(numPlayers: number): Result {
   const names = SEAT_NAMES.slice(0, numPlayers) as unknown as string[];
-  const client = Client({ game: makeGloaming({ names }), numPlayers });
+  const heroes = Array.from({ length: numPlayers }, rndHero);
+  const client = Client({ game: makeGloaming({ names, heroes }), numPlayers });
   client.start();
 
   const stats: TurnStat[] = [];
@@ -162,8 +172,13 @@ function playGame(numPlayers: number): Result {
     totalTurns: stats.length,
     nailBiter,
     softlock,
+    perPlayer: heroes.map((h) => ({ hero: h, won })),
   };
 }
+
+const heroTally: Record<HeroId, { games: number; wins: number }> = Object.fromEntries(
+  HERO_IDS.map((h) => [h, { games: 0, wins: 0 }]),
+) as Record<HeroId, { games: number; wins: number }>;
 
 function run(numPlayers: number, games: number) {
   const results: Result[] = [];
@@ -176,6 +191,12 @@ function run(numPlayers: number, games: number) {
   const totalTurns = results.reduce((s, r) => s + r.totalTurns, 0);
   const deadWisp = results.reduce((s, r) => s + r.deadTurns, 0);
   const nail = results.filter((r) => r.nailBiter).length;
+
+  for (const r of results)
+    for (const pp of r.perPlayer) {
+      heroTally[pp.hero].games++;
+      if (pp.won) heroTally[pp.hero].wins++;
+    }
 
   console.log(`\n── ${numPlayers} players · ${games} games ─────────────────────`);
   console.log(`  win-rate      ${((wins / games) * 100).toFixed(0)}%  (target 45-55%)`);
@@ -192,5 +213,23 @@ function run(numPlayers: number, games: number) {
 
 let softlockTotal = 0;
 for (const n of [2, 3, 4]) softlockTotal += run(n, 150).softlocks;
+
+// ── per-hero balance (spread must stay ≤ ±8 pts) ─────────────────────────────
+console.log(`\n── per-hero win-rate (random hero assignment, all counts) ──`);
+const heroRates = HERO_IDS.map((h) => ({
+  h,
+  rate: heroTally[h].games ? (heroTally[h].wins / heroTally[h].games) * 100 : 0,
+  n: heroTally[h].games,
+}));
+const mean = heroRates.reduce((s, x) => s + x.rate, 0) / heroRates.length;
+let maxDev = 0;
+for (const x of heroRates) {
+  const dev = x.rate - mean;
+  maxDev = Math.max(maxDev, Math.abs(dev));
+  console.log(`  ${x.h.padEnd(12)} ${x.rate.toFixed(0)}%  (${x.n} games, ${dev >= 0 ? '+' : ''}${dev.toFixed(1)} vs mean)`);
+}
+const spreadOk = maxDev <= 8;
+console.log(`  mean ${mean.toFixed(0)}% · max deviation ${maxDev.toFixed(1)} pts  (${spreadOk ? 'OK ≤±8' : 'FAIL >±8'})`);
+
 console.log(`\n${softlockTotal === 0 ? 'OK: no softlocks across all games' : `FAIL: ${softlockTotal} SOFTLOCKS`}`);
 process.exit(softlockTotal === 0 ? 0 : 1);

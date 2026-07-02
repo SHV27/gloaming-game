@@ -3,6 +3,7 @@ import { INVALID_MOVE } from 'boardgame.io/core';
 import type { GState, Player } from './types';
 import { BOARD, GATE_ID, OUTER_RING_IDS, spreadOuter } from './board';
 import { EVENT_DECK, eventById } from './events';
+import { defaultHeroes, type HeroId } from './heroes';
 import {
   TORCH_START,
   TORCH_BURN_PER_ROUND,
@@ -75,11 +76,14 @@ function driftToGate(G: GState, p: Player): void {
 
 export interface GloamingConfig {
   names: string[]; // 2–6 names; length = numPlayers
+  heroes?: HeroId[]; // S6 — one per seat (falls back to a valid default roster)
   marked?: boolean; // dormant this session (4+)
 }
 
 export function makeGloaming(config: GloamingConfig): Game<GState> {
   const names = config.names;
+  const heroes =
+    config.heroes && config.heroes.length === names.length ? config.heroes : defaultHeroes(names.length);
 
   return {
     name: 'gloaming',
@@ -104,6 +108,7 @@ export function makeGloaming(config: GloamingConfig): Game<GState> {
           torch: TORCH_START,
           wisp: false,
           carrying: [],
+          hero: heroes[seat],
           role: String(seat) === markedId ? 'marked' : 'bearer',
         };
       });
@@ -190,8 +195,12 @@ export function makeGloaming(config: GloamingConfig): Game<GState> {
         const p = G.players[ctx.currentPlayer];
         if (!p) return;
 
-        // the night burns a notch off the active torch (may gutter it to a Wisp)
-        if (!p.wisp) burnTorch(G, p, TORCH_BURN_PER_ROUND);
+        // the night burns a notch off the active torch (may gutter it to a Wisp).
+        // THE STUBBORN FLAME burns half as slow — it skips the burn on even rounds.
+        if (!p.wisp) {
+          const skipBurn = p.hero === 'stubborn' && G.round % 2 === 0;
+          if (!skipBurn) burnTorch(G, p, TORCH_BURN_PER_ROUND);
+        }
 
         if (p.wisp) {
           // a Wisp's turn auto-resolves — it drifts to the Gate and passes. Never a dead end.
@@ -257,7 +266,7 @@ export function makeGloaming(config: GloamingConfig): Game<GState> {
         if (G.hasRolled || G.acted) return INVALID_MOVE;
         const r = random.D6();
         G.lastRoll = r;
-        G.stride = strideFor(r, p.carrying.length);
+        G.stride = strideFor(r, p.carrying.length, p.hero);
         G.hasRolled = true;
         flash(G, 'dice');
       },
